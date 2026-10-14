@@ -1,0 +1,12 @@
+
+USE PIMIV_PainelADM;
+GO
+
+CREATE TABLE dbo.Perfis (
+    IdPerfil INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    NomePerfil NVARCHAR(50) NOT NULL UNIQUE,
+    Descricao NVARCHAR(200) NULL,
+    Ativo BIT NOT NULL DEFAULT 1
+);
+GO
+  
