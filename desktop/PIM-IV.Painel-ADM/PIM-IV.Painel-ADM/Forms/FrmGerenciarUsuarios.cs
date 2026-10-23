@@ -10,6 +10,7 @@ namespace PIM_IV.Painel_ADM.Forms
     {
         private Button? btnRedefinirSenha;
 
+        // Adiciona a ação de redefinição após a criação da interface.
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
@@ -21,28 +22,127 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Name = "btnRedefinirSenha",
                 Text = "Redefinir senha",
-                Location = new Point(590, 585),
                 Size = new Size(180, 42),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
                 BackColor = Color.FromArgb(40, 92, 170),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font(
                     "Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                UseVisualStyleBackColor = false
             };
 
             btnRedefinirSenha.FlatAppearance.BorderSize = 0;
 
-            btnRedefinirSenha.Click += (s, args) =>
+            btnRedefinirSenha.Click += (sender, args) =>
             {
                 AbrirRedefinicaoSenha();
             };
 
-            Controls.Add(btnRedefinirSenha);
-            btnRedefinirSenha.BringToFront();
+            // Procura o botão existente, inclusive em painéis internos.
+            Button? botaoAtualizar = LocalizarBotaoAtualizar(this);
+
+            if (botaoAtualizar != null &&
+                botaoAtualizar.Parent != null)
+            {
+                Control container = botaoAtualizar.Parent;
+
+                container.Controls.Add(btnRedefinirSenha);
+
+                // Utiliza o mesmo sistema de posicionamento dos botões.
+                btnRedefinirSenha.Anchor =
+                    AnchorStyles.Bottom | AnchorStyles.Left;
+
+                PosicionarBotaoRedefinirSenha(botaoAtualizar);
+
+                container.Resize += (sender, args) =>
+                {
+                    PosicionarBotaoRedefinirSenha(botaoAtualizar);
+                };
+            }
+            else
+            {
+                // Mantém o botão acessível caso a referência não exista.
+                FlowLayoutPanel painelAcoes = new FlowLayoutPanel
+                {
+                    Name = "pnlRedefinicaoSenha",
+                    Dock = DockStyle.Bottom,
+                    AutoSize = true,
+                    AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                    FlowDirection = FlowDirection.LeftToRight,
+                    WrapContents = true,
+                    Padding = new Padding(12, 8, 12, 8),
+                    BackColor = Color.Transparent
+                };
+
+                btnRedefinirSenha.Margin =
+                    new Padding(4);
+
+                painelAcoes.Controls.Add(btnRedefinirSenha);
+                Controls.Add(painelAcoes);
+                painelAcoes.BringToFront();
+            }
         }
 
+        // Localiza recursivamente o botão de atualização.
+        private Button? LocalizarBotaoAtualizar(Control container)
+        {
+            foreach (Control controle in container.Controls)
+            {
+                if (controle is Button botao &&
+                    botao.Text.Contains(
+                        "Atualizar lista",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return botao;
+                }
+
+                Button? resultado =
+                    LocalizarBotaoAtualizar(controle);
+
+                if (resultado != null)
+                    return resultado;
+            }
+
+            return null;
+        }
+
+        // Alinha a redefinição de senha à área de ações.
+        private void PosicionarBotaoRedefinirSenha(
+            Button botaoReferencia)
+        {
+            if (btnRedefinirSenha == null ||
+                botaoReferencia.IsDisposed)
+            {
+                return;
+            }
+
+            Control? container = botaoReferencia.Parent;
+
+            if (container == null)
+                return;
+
+            const int espacamento = 14;
+
+            int posicaoX =
+                botaoReferencia.Right + espacamento;
+
+            int posicaoY = botaoReferencia.Top;
+
+            btnRedefinirSenha.Height =
+                botaoReferencia.Height;
+
+            btnRedefinirSenha.Location =
+                new Point(posicaoX, posicaoY);
+
+            // Caso não haja espaço horizontal, permite rolagem.
+            if (container is ScrollableControl painel)
+            {
+                painel.AutoScroll = true;
+            }
+        }
+
+        // Permite redefinir a senha de um usuário ativo.
         private void AbrirRedefinicaoSenha()
         {
             int? idUsuario = ObterSelecionado();
@@ -68,6 +168,7 @@ namespace PIM_IV.Painel_ADM.Forms
                     "Usuário inativo",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
+
                 return;
             }
 
@@ -77,10 +178,12 @@ namespace PIM_IV.Painel_ADM.Forms
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 ClientSize = new Size(470, 355),
+                MinimumSize = new Size(440, 380),
                 MaximizeBox = false,
                 MinimizeBox = false,
                 BackColor = Color.White,
-                Font = new Font("Segoe UI", 10)
+                Font = new Font("Segoe UI", 10),
+                AutoScaleMode = AutoScaleMode.Dpi
             };
 
             Label lblUsuario = new Label
@@ -89,7 +192,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 Location = new Point(25, 20),
                 Size = new Size(420, 55),
                 Font = new Font(
-                    "Segoe UI", 10, FontStyle.Bold)
+                    "Segoe UI", 10, FontStyle.Bold),
+                Anchor = AnchorStyles.Top |
+                         AnchorStyles.Left |
+                         AnchorStyles.Right
             };
 
             Label lblSenha = new Label
@@ -104,7 +210,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 Location = new Point(25, 110),
                 Width = 420,
                 UseSystemPasswordChar = true,
-                MaxLength = 128
+                MaxLength = 128,
+                Anchor = AnchorStyles.Top |
+                         AnchorStyles.Left |
+                         AnchorStyles.Right
             };
 
             Label lblConfirmar = new Label
@@ -119,7 +228,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 Location = new Point(25, 180),
                 Width = 420,
                 UseSystemPasswordChar = true,
-                MaxLength = 128
+                MaxLength = 128,
+                Anchor = AnchorStyles.Top |
+                         AnchorStyles.Left |
+                         AnchorStyles.Right
             };
 
             Label lblRegras = new Label
@@ -129,13 +241,15 @@ namespace PIM_IV.Painel_ADM.Forms
                        "O usuário deverá trocar essa senha no próximo acesso.",
                 Location = new Point(25, 225),
                 Size = new Size(420, 55),
-                ForeColor = Color.DimGray
+                ForeColor = Color.DimGray,
+                Anchor = AnchorStyles.Top |
+                         AnchorStyles.Left |
+                         AnchorStyles.Right
             };
 
             Button btnCancelar = new Button
             {
                 Text = "Cancelar",
-                Location = new Point(195, 295),
                 Size = new Size(110, 40),
                 DialogResult = DialogResult.Cancel
             };
@@ -143,7 +257,6 @@ namespace PIM_IV.Painel_ADM.Forms
             Button btnSalvar = new Button
             {
                 Text = "Redefinir",
-                Location = new Point(320, 295),
                 Size = new Size(125, 40),
                 BackColor = Color.FromArgb(40, 92, 170),
                 ForeColor = Color.White,
@@ -152,7 +265,21 @@ namespace PIM_IV.Painel_ADM.Forms
 
             btnSalvar.FlatAppearance.BorderSize = 0;
 
-            btnSalvar.Click += (s, args) =>
+            // Organiza os botões do diálogo sem sobreposição.
+            FlowLayoutPanel painelBotoes = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 60,
+                FlowDirection = FlowDirection.RightToLeft,
+                Padding = new Padding(15, 8, 15, 8),
+                WrapContents = false,
+                BackColor = Color.White
+            };
+
+            painelBotoes.Controls.Add(btnSalvar);
+            painelBotoes.Controls.Add(btnCancelar);
+
+            btnSalvar.Click += (sender, args) =>
             {
                 if (string.IsNullOrWhiteSpace(txtSenha.Text))
                 {
@@ -229,8 +356,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 lblConfirmar,
                 txtConfirmar,
                 lblRegras,
-                btnCancelar,
-                btnSalvar
+                painelBotoes
             });
 
             janela.AcceptButton = btnSalvar;
