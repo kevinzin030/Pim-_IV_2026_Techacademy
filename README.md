@@ -15,7 +15,7 @@ O TechAcademy reúne módulos que se comunicam por uma API central. A plataforma
 | Desktop | C# + Windows Forms | Desenvolver |
 | Mobile | Android | Desenvolver |
 | Banco de dados | SQL SERVER | Documentar e integrar |
-| Documentação | Markdown e diagramas UML | Em organização |
+| Documentação | ASTAH e diagramas UML | Em organização |
 
 ## Estrutura do repositório
 
