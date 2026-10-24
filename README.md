@@ -56,7 +56,7 @@ As pastas dos módulos serão preenchidas conforme o desenvolvimento avançar. O
 
 ## Prazo acadêmico
 
-**Entrega prevista: 14 de novembro de 2026.**
+**Entrega prevista: 22 de novembro de 2026.**
 
 ## Começando
 
