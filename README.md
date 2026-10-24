@@ -10,7 +10,7 @@ O TechAcademy reúne módulos que se comunicam por uma API central. A plataforma
 
 | Módulo | Tecnologia prevista | Situação inicial |
 |---|---|---|
-| Web | Projeto existente em [site-techacademy](https://github.com/kevinzin030/site-techacademy) | Reutilizar e adaptar |
+| Web |   HTML + CSS + JAVASCRIPT | Desenvolver |
 | API | Node.js + Express | Desenvolver |
 | Desktop | C# + Windows Forms | Desenvolver |
 | Mobile | Android | Desenvolver |
