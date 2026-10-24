@@ -12,7 +12,7 @@
 
 ## Prazo
 
-Entrega prevista: **14/11/2026**.
+Entrega prevista: **22/11/2026**.
 
 ## Diretrizes de trabalho
 
