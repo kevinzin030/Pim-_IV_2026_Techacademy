@@ -1,0 +1,15 @@
+TECHACADEMY — ATUALIZAÇÃO DE AULAS, PDF E QUIZZES
+
+O que foi ajustado:
+- Na disciplina do aluno, as aulas aparecem primeiro, uma por cartão.
+- O PDF anexado pelo professor pode ser visualizado na página e baixado.
+- Cada quiz é aberto em uma tela separada pelo botão “Acessar quiz”.
+- O professor pode adicionar várias perguntas a um quiz, com quatro alternativas e resposta correta por pergunta.
+- O professor pode vincular o quiz a uma aula específica ou criar um quiz geral da disciplina.
+- A plataforma sincroniza disciplinas, aulas, arquivos e quizzes usando localStorage no mesmo navegador.
+
+IMPORTANTE:
+- Esta versão é uma simulação local, sem API ou banco de dados.
+- Para compartilhar o localStorage entre dashboard-professor.html e dashboard-aluno.html, abra o projeto pelo mesmo endereço de servidor local (por exemplo, VS Code + Live Server), e não abra cada arquivo por caminhos file:// diferentes.
+- Os PDFs são guardados como dados locais e limitados a 3 MB por arquivo para evitar exceder a capacidade do navegador. Para uso real por várias pessoas/dispositivos, será necessário armazenamento no servidor.
+- Os materiais de demonstração antigos só mostram o PDF se um arquivo PDF real for anexado pelo professor.

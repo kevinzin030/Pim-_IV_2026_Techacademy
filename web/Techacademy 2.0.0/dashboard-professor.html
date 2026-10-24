@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechAcademy - Painel do Professor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS Customizado -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="text-slate-800 antialiased bg-slate-50 min-h-screen flex flex-col font-sans">
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-md"></div>
+
+    <div class="min-h-screen flex flex-col md:flex-row">
+        <div id="mobile-menu-backdrop" class="mobile-menu-backdrop" aria-hidden="true"></div>
+        <aside id="sidebar" class="w-full md:w-64 bg-brand-dark text-white flex-shrink-0 flex flex-col border-r border-slate-800">
+            <div class="p-5 flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center text-white font-bold shadow-md">
+                        <i class="fa-solid fa-graduation-cap text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-base tracking-wide text-white">TechAcademy</h2>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-700 font-medium">Professor</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+                <div class="text-[11px] font-semibold text-slate-400 uppercase px-3 pt-2 pb-1">Menu Principal</div>
+                <button id="nav-disciplinas" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all bg-brand-blue text-white shadow-md">
+                    <i class="fa-solid fa-book-bookmark w-5 text-center"></i> <span>Minhas Disciplinas</span>
+                </button>
+                <button id="nav-postar-aula" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-file-arrow-up w-5 text-center"></i> <span>Postar Slides / Aulas</span>
+                </button>
+                <button id="nav-criar-quiz" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-square-plus w-5 text-center"></i> <span>Criar Quizzes & Desafio</span>
+                </button>
+                <button id="nav-lancar-notas" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-list-check w-5 text-center"></i> <span>Lançar & Consultar Notas</span>
+                </button>
+                <button id="nav-metricas" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i> <span>Métricas da Turma</span>
+                </button>
+                <button id="nav-perfil" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-user-gear w-5 text-center"></i> <span>Meu Perfil</span>
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-9 h-9 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        PF
+                    </div>
+                    <div class="truncate">
+                        <div id="prof-name-sidebar" class="text-sm font-medium text-white truncate">Dr. Carlos Eduardo</div>
+                        <div id="prof-email-sidebar" class="text-xs text-slate-400 truncate">carlos@techacademy.edu</div>
+                    </div>
+                </div>
+                <a href="index.html" title="Sair da conta" class="text-slate-400 hover:text-red-400 p-2 transition">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-50 overflow-y-auto">
+            <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex flex-row items-center justify-between gap-3 sticky top-0 z-30 shadow-sm">
+                <button id="mobile-menu-toggle" type="button" class="mobile-menu-toggle" aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-page-heading">
+                    <h1 id="page-title" class="text-xl font-bold text-slate-800">Minhas Disciplinas</h1>
+                    <p id="page-subtitle" class="text-xs text-slate-500">Gerencie seus cursos, postagens e avaliações acadêmicas</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="dashboard-aluno.html" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition">
+                        <i class="fa-solid fa-repeat mr-1"></i> Ir para Perfil Aluno
+                    </a>
+                </div>
+            </header>
+
+            <div id="main-content-area" class="p-6 flex-1 max-w-7xl w-full mx-auto">
+                <!-- Área de renderização: as estruturas das telas estão nos templates deste HTML. O JavaScript preenche os dados e conecta os eventos. -->
+            </div>
+        </main>
+    </div>
+
+
+    <!-- Templates HTML da interface: a estrutura visual fica aqui; o JavaScript fornece somente os dados. -->
+    <!-- Fragmento ta-prof-fragment-001: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-001">
+<i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i> <span>__TA_SLOT_0__</span>
+    </template>
+    <!-- Fragmento ta-prof-fragment-002: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-002">
+
+        <div class="max-w-md mx-auto bg-white p-6 rounded-2xl border border-blue-100 shadow-sm text-xs">
+            <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-user-gear text-brand-blue"></i> Perfil do Professor
+            </h2>
+            <form id="form-perfil" class="space-y-3">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nome Completo</label>
+                    <input type="text" value="__TA_SLOT_0__" id="perf-nome" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">E-mail Profissional</label>
+                    <input type="email" value="__TA_SLOT_1__" id="perf-email" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Matrícula Docente</label>
+                    <input type="text" value="__TA_SLOT_2__" disabled class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-mono">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Telefone de Contato</label>
+                    <input type="text" value="__TA_SLOT_3__" id="perf-tel" class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-brand-blue hover:bg-brand-navy text-white font-bold rounded-xl transition shadow-sm">
+                    Salvar Dados
+                </button>
+            </form>
+        </div>
+    
+    </template>
+    <!-- Fragmento ta-prof-fragment-003: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-003">
+
+        <div class="space-y-6 text-xs">
+            <!-- Cards de Visão Geral -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
+                    <div class="text-slate-400 font-semibold mb-1">Média Geral da Turma</div>
+                    <div class="text-2xl font-extrabold text-brand-blue flex items-center justify-between">
+                        <span>__TA_SLOT_0__ / 10</span>
+                        <i class="fa-solid fa-chart-line text-blue-200"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
+                    <div class="text-slate-400 font-semibold mb-1">Engajamento em Quizzes</div>
+                    <div class="text-2xl font-extrabold text-amber-500 flex items-center justify-between">
+                        <span>__TA_SLOT_1__ / 10</span>
+                        <i class="fa-solid fa-bolt text-amber-200"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
+                    <div class="text-slate-400 font-semibold mb-1">Taxa de Aprovados</div>
+                    <div class="text-2xl font-extrabold text-emerald-600 flex items-center justify-between">
+                        <span>__TA_SLOT_2__%</span>
+                        <i class="fa-solid fa-graduation-cap text-emerald-200"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
+                    <div class="text-slate-400 font-semibold mb-1">Total de Alunos</div>
+                    <div class="text-2xl font-extrabold text-slate-700 flex items-center justify-between">
+                        <span>__TA_SLOT_3__</span>
+                        <i class="fa-solid fa-users text-slate-300"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Distribuição em Barras Visuais -->
+            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                <h3 class="font-bold text-sm text-slate-800">Distribuição Acadêmica da Turma</h3>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between mb-1 font-semibold">
+                            <span class="text-emerald-700">Aprovados (Média ≥ 7.0)</span>
+                            <span class="text-slate-600">__TA_SLOT_4__ Aluno(s)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                            <div class="progress-fill progress-fill--approved" data-progress-percent="__TA_SLOT_5__"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-1 font-semibold">
+                            <span class="text-amber-700">Em Exame (Média 5.0 - 6.9)</span>
+                            <span class="text-slate-600">__TA_SLOT_6__ Aluno(s)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                            <div class="progress-fill progress-fill--exam" data-progress-percent="__TA_SLOT_7__"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-1 font-semibold">
+                            <span class="text-red-700">Reprovados (Média < 5.0)</span>
+                            <span class="text-slate-600">__TA_SLOT_8__ Aluno(s)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                            <div class="progress-fill progress-fill--failed" data-progress-percent="__TA_SLOT_9__"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+    </template>
+    <!-- Fragmento ta-prof-fragment-004: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-004">
+
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border __TA_SLOT_0__">
+                    __TA_SLOT_1__
+                </span>
+            
+    </template>
+    <!-- Fragmento ta-prof-fragment-006: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-006">
+
+                            <tr class="hover:bg-slate-50/50 transition">
+                                <td class="p-3 font-semibold text-slate-800">
+                                    <div>__TA_SLOT_0__</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">Mat: __TA_SLOT_1__</div>
+                                </td>
+                                <td class="p-3">
+                                    <input type="number" step="0.1" min="0" max="10" value="__TA_SLOT_2__" data-index="__TA_SLOT_3__" data-field="p1" class="input-nota w-20 p-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700">
+                                </td>
+                                <td class="p-3">
+                                    <input type="number" step="0.1" min="0" max="10" value="__TA_SLOT_4__" data-index="__TA_SLOT_5__" data-field="p2" class="input-nota w-20 p-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700">
+                                </td>
+                                <td class="p-3">
+                                    <input type="number" step="0.1" min="0" max="10" value="__TA_SLOT_6__" data-index="__TA_SLOT_7__" data-field="trabalho" class="input-nota w-20 p-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700">
+                                </td>
+                                <td class="p-3">
+                                    <input type="number" step="0.1" min="0" max="10" value="__TA_SLOT_8__" data-index="__TA_SLOT_9__" data-field="quizzes" class="input-nota w-20 p-1.5 border border-slate-200 rounded-xl text-center font-bold text-slate-700">
+                                </td>
+                                <td class="p-3 text-center font-extrabold text-sm text-brand-blue" id="media-__TA_SLOT_10__">
+                                    __TA_SLOT_11__
+                                </td>
+                                <td class="p-3 text-center" id="situacao-__TA_SLOT_12__">
+                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border __TA_SLOT_13__">
+                                        __TA_SLOT_14__
+                                    </span>
+                                </td>
+                            </tr>
+                        
+    </template>
+    <!-- Fragmento ta-prof-fragment-005: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-005">
+
+        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm overflow-x-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-brand-blue"></i> Diário de Notas dos Alunos
+                </h3>
+                <span class="text-[11px] bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-bold border border-emerald-200">
+                    <i class="fa-solid fa-floppy-disk mr-1"></i> Alterações salvas dinamicamente
+                </span>
+            </div>
+            
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-blue-50/80 text-slate-600 font-bold uppercase border-b border-blue-100">
+                        <th class="p-3">Aluno</th>
+                        <th class="p-3 w-24">P1 (30%)</th>
+                        <th class="p-3 w-24">P2 (30%)</th>
+                        <th class="p-3 w-24">Trabalho (25%)</th>
+                        <th class="p-3 w-24">Quizzes (15%)</th>
+                        <th class="p-3 w-20 text-center">Média</th>
+                        <th class="p-3 w-28 text-center">Situação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    __TA_SLOT_0__
+                </tbody>
+            </table>
+        </div>
+    
+    </template>
+    <!-- Fragmento ta-prof-fragment-008: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-008">
+<option value="__TA_SLOT_0__" __TA_SLOT_1__>__TA_SLOT_2__</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-009: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-009">
+
+                                <option value="__TA_SLOT_0__" __TA_SLOT_1__>__TA_SLOT_2__ - __TA_SLOT_3__</option>
+                            
+    </template>
+    <!-- Fragmento ta-prof-fragment-010: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-010">
+
+                    <div class="bg-blue-50/50 border border-blue-100 p-8 rounded-2xl text-center text-slate-500">
+                        <i class="fa-solid fa-circle-info text-2xl text-brand-blue mb-2"></i>
+                        <p class="font-semibold text-sm">Por favor, selecione primeiro a Turma e depois a Disciplina para exibir e lançar as notas dos alunos.</p>
+                    </div>
+                
+    </template>
+    <!-- Fragmento ta-prof-fragment-007: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-007">
+
+        <div class="space-y-6 text-xs">
+            <!-- Seleção de Turma e Disciplina (Passo 1 e 2) -->
+            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-filter text-brand-blue"></i> Seleção de Turma & Disciplina
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">1º Passo: Selecione a Turma</label>
+                        <select id="select-turma" class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                            <option value="">-- Escolha uma Turma --</option>
+                            __TA_SLOT_0__
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">2º Passo: Selecione a Disciplina</label>
+                        <select id="select-disciplina" __TA_SLOT_1__ class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none disabled:bg-slate-100 disabled:text-slate-400">
+                            <option value="">-- Escolha uma Disciplina --</option>
+                            __TA_SLOT_2__
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela de Lançamento de Notas (Disponível apenas após as 2 seleções) -->
+            <div id="container-tabela-notas">
+                __TA_SLOT_3__
+            </div>
+        </div>
+    
+    </template>
+    <!-- Fragmento ta-prof-fragment-012: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-012">
+<option value="__TA_SLOT_0__|__TA_SLOT_1__">__TA_SLOT_2__</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-011: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-011">
+__TA_SLOT_0__<option value="geral|geral">Quiz geral da disciplina</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-014: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-014">
+<button type="button" class="remover-pergunta text-red-600 text-xs font-bold">Remover</button>
+    </template>
+    <!-- Fragmento ta-prof-fragment-013: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-013">
+<div class="flex justify-between items-center"><strong class="text-slate-700">Pergunta __TA_SLOT_0__</strong>__TA_SLOT_1__</div><textarea required rows="2" class="pergunta-enunciado w-full p-2 border rounded-lg" placeholder="Digite a pergunta __TA_SLOT_2__..."></textarea><div class="grid gap-2"><input required class="pergunta-opcao w-full p-2 border rounded-lg" placeholder="Alternativa A"><input required class="pergunta-opcao w-full p-2 border rounded-lg" placeholder="Alternativa B"><input required class="pergunta-opcao w-full p-2 border rounded-lg" placeholder="Alternativa C"><input required class="pergunta-opcao w-full p-2 border rounded-lg" placeholder="Alternativa D"></div><label class="block text-slate-600 font-semibold">Resposta correta <select class="pergunta-correta mt-1 w-full p-2 border rounded-lg"><option value="0">Alternativa A</option><option value="1">Alternativa B</option><option value="2">Alternativa C</option><option value="3">Alternativa D</option></select></label>
+    </template>
+    <!-- Fragmento ta-prof-fragment-016: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-016">
+<option value="__TA_SLOT_0__">__TA_SLOT_1__ - __TA_SLOT_2__</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-017: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-017">
+<option value="__TA_SLOT_0__|__TA_SLOT_1__">__TA_SLOT_2__ — __TA_SLOT_3__</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-018: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-018">
+<option value="__TA_SLOT_0__">__TA_SLOT_1__ - __TA_SLOT_2__</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-019: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-019">
+<p class="text-slate-500">Nenhum quiz criado ainda.</p>
+    </template>
+    <!-- Fragmento ta-prof-fragment-020: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-020">
+<div class="flex flex-wrap items-center justify-between gap-3 p-3 border rounded-xl"><div><div class="font-bold text-slate-800">__TA_SLOT_0__</div><div class="text-slate-500">__TA_SLOT_1__ · __TA_SLOT_2__ pergunta(s) · __TA_SLOT_3__ XP</div></div><button type="button" data-editar-quiz="__TA_SLOT_4__" data-disc="__TA_SLOT_5__" class="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 font-bold">Editar quiz</button></div>
+    </template>
+    <!-- Fragmento ta-prof-fragment-015: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-015">
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
+            <!-- Formulário de Quiz -->
+            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm">
+                <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-square-plus text-amber-500"></i> Criar Novo Quiz de Fixação
+                </h2>
+                <form id="form-criar-quiz" class="space-y-3"><input type="hidden" id="quiz-edit-id" value="">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Disciplina</label>
+                        <select id="quiz-disciplina" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                            __TA_SLOT_0__
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Vincular a uma aula</label>
+                        <select id="quiz-aula" required class="w-full p-2.5 border border-slate-200 rounded-xl">__TA_SLOT_1__<option value="geral|geral">Quiz geral da disciplina (selecione a disciplina acima)</option></select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Título do Quiz</label>
+                        <input type="text" id="quiz-titulo" required placeholder="Ex: Quiz 02 - Usabilidade Mobile" class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Pontuação XP (Atribuída ao Aluno)</label>
+                        <input type="number" id="quiz-xp" value="100" min="10" step="10" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Perguntas do quiz</label>
+                        <div id="quiz-perguntas-container" class="space-y-4"></div>
+                        <button type="button" id="adicionar-pergunta" class="mt-3 px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-bold"><i class="fa-solid fa-plus mr-1"></i> Adicionar outra pergunta</button>
+                    </div>
+                    <button id="btn-salvar-quiz" type="submit" class="w-full py-2.5 bg-brand-blue hover:bg-brand-navy text-white font-bold rounded-xl transition shadow-sm">Cadastrar Quiz</button><button type="button" id="cancelar-edicao-quiz" class="hidden w-full py-2 border rounded-xl">Cancelar edição</button>
+                </form>
+            </div>
+
+            <!-- Formulário de Desafio Final -->
+            <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-emerald-500"></i> Cadastrar / Editar Desafio Final
+                    </h2>
+                    <form id="form-desafio-final" class="space-y-3">
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Disciplina</label>
+                            <select id="desafio-disciplina" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                                __TA_SLOT_2__
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Título do Desafio Final</label>
+                            <input type="text" id="desafio-titulo" required placeholder="Ex: Projeto Integrador Final" class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Recompensa em XP</label>
+                            <input type="number" id="desafio-xp" value="300" min="50" step="50" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Descrição / Diretrizes do Desafio</label>
+                            <textarea id="desafio-desc" required rows="4" placeholder="Descreva os requisitos técnicos do desafio final..." class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none"></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-sm">
+                            Salvar Desafio Final
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <section class="mt-6 bg-white p-6 rounded-2xl border border-blue-100 shadow-sm text-xs"><h2 class="text-base font-bold text-slate-800 mb-4">Quizzes já criados — editar</h2><div class="space-y-3">__TA_SLOT_3__</div></section>
+    
+    </template>
+    <!-- Fragmento ta-prof-fragment-021: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-021">
+<i class="fa-solid fa-pen text-brand-blue"></i> Editar postagem da aula
+    </template>
+    <!-- Fragmento ta-prof-fragment-022: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-022">
+<i class="fa-solid fa-cloud-arrow-up mr-1"></i> Postar Aula
+    </template>
+    <!-- Fragmento ta-prof-fragment-023: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-023">
+<i class="fa-solid fa-file-arrow-up text-brand-blue"></i> Publicar Nova Aula / Slide PDF
+    </template>
+    <!-- Fragmento ta-prof-fragment-025: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-025">
+<option value="__TA_SLOT_0__">__TA_SLOT_1__ - __TA_SLOT_2__</option>
+    </template>
+    <!-- Fragmento ta-prof-fragment-026: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-026">
+<p class="text-slate-500">Nenhuma aula publicada ainda.</p>
+    </template>
+    <!-- Fragmento ta-prof-fragment-027: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-027">
+<div class="flex flex-wrap items-center justify-between gap-3 p-3 border rounded-xl"><div><div class="font-bold text-slate-800">__TA_SLOT_0__</div><div class="text-slate-500">__TA_SLOT_1__ · __TA_SLOT_2__ · Publicada: __TA_SLOT_3__</div></div><button type="button" data-editar-aula="__TA_SLOT_4__" data-disc="__TA_SLOT_5__" class="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 font-bold">Editar postagem</button></div>
+    </template>
+    <!-- Fragmento ta-prof-fragment-024: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-024">
+
+        <div class="max-w-2xl mx-auto bg-white p-6 rounded-2xl border border-blue-100 shadow-sm text-xs">
+            <h2 id="titulo-form-aula" class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-file-arrow-up text-brand-blue"></i> Publicar Nova Aula / Slide PDF
+            </h2>
+            <form id="form-postar-aula" class="space-y-4">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Selecione a Disciplina</label>
+                    <select id="aula-disciplina" required class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                        __TA_SLOT_0__
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Título da Aula</label>
+                    <input type="hidden" id="aula-edit-id" value=""><input type="text" id="aula-titulo" required placeholder="Ex: Aula 03 - Interfaces Flexíveis e Grid" class="w-full p-2.5 border border-slate-200 rounded-xl focus:border-brand-blue focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Arquivo de Slide (PDF)</label>
+                    <input type="file" id="aula-pdf" accept=".pdf" class="w-full p-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-600">
+                </div>
+                <p class="text-slate-500">Para editar uma aula existente, o PDF é opcional. Se não selecionar outro arquivo, o atual será mantido.</p><button id="cancelar-edicao-aula" type="button" class="hidden w-full py-2 border rounded-xl" class="button-cancel-edit">Cancelar edição</button><button id="btn-salvar-aula" type="submit" class="button-post-lesson"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Postar Aula</button>
+            </form>
+        </div>
+        <section class="mt-6 bg-white p-6 rounded-2xl border border-blue-100 shadow-sm"><h2 class="text-base font-bold text-slate-800 mb-4">Aulas já publicadas — editar postagens</h2><div class="space-y-3">__TA_SLOT_1__</div></section>
+    
+    </template>
+    <!-- Fragmento ta-prof-fragment-029: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-029">
+
+                <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-xs font-bold px-3 py-1 bg-blue-50 text-brand-blue rounded-lg border border-blue-100">__TA_SLOT_0__</span>
+                        <span class="text-xs font-medium text-slate-500"><i class="fa-solid fa-users mr-1"></i> __TA_SLOT_1__</span>
+                    </div>
+                    <h3 class="font-bold text-lg text-slate-800 mb-2">__TA_SLOT_2__</h3>
+                    <div class="space-y-2 mt-4 text-xs text-slate-600">
+                        <div class="flex items-center gap-2"><i class="fa-solid fa-file-pdf text-red-500"></i> __TA_SLOT_3__ Aulas/Slides Cadastrados</div>
+                        <div class="flex items-center gap-2"><i class="fa-solid fa-square-question text-amber-500"></i> __TA_SLOT_4__ Quizzes Ativos</div>
+                        <div class="flex items-center gap-2"><i class="fa-solid fa-trophy text-emerald-500"></i> Desafio Final: __TA_SLOT_5__</div>
+                    </div>
+                </div>
+            
+    </template>
+    <!-- Fragmento ta-prof-fragment-028: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
+    <template id="ta-prof-fragment-028">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            __TA_SLOT_0__
+        </div>
+    
+    </template>
+
+    <!-- Script JS do Professor -->
+    <script src="js/app-professor.js"></script>
+
+    <script src="js/mobile-menu.js"></script>
+</body>
+</html>

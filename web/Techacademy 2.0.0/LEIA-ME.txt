@@ -1,0 +1,30 @@
+TECHACADEMY — VERSÃO CONSOLIDADA
+
+Como executar
+1. Extraia a pasta do ZIP.
+2. Abra a pasta no VS Code.
+3. Execute index.html pelo Live Server.
+
+Organização
+- HTML: estrutura fixa das páginas e templates completos das telas e componentes dinâmicos. Os elementos div, section, form, button, labels e classes dos fragmentos ficam declarados nos HTMLs, não em strings de JavaScript.
+- css/styles.css: estilos próprios, cores, estados visuais e responsividade. As classes utilitárias do Tailwind foram preservadas para manter o visual atual.
+- js/login.js: interações da tela de login simulada.
+- js/app-aluno.js: funcionalidades do painel do aluno.
+- js/app-professor.js: funcionalidades do painel do professor.
+- js/mobile-menu.js: comportamento do menu hambúrguer.
+- LEIA-ME-ARQUITETURA.md: explicação detalhada da separação HTML/CSS/JS e dos templates.
+
+Os arquivos JavaScript foram comentados em português com explicações das funções principais, do estado, da persistência e dos eventos. Os HTMLs têm comentários antes das áreas e dos templates reutilizáveis.
+
+Funcionalidades incluídas nesta versão
+- Protótipo sem API e sem banco de dados, com persistência local via localStorage.
+- Publicação e edição de aulas/materiais e quizzes pelo professor.
+- Quizzes organizados por aula e acessados pelo botão “Acessar quiz”.
+- Datas e horários das publicações, notificações no painel do aluno.
+- Menu hambúrguer para navegação em telas pequenas.
+- Botões com estilos definidos no CSS em vez de estilos inline para os componentes ajustados.
+
+Importante
+- Os dados do localStorage ficam neste navegador e nesta origem; para testar professor e aluno com os mesmos dados, abra ambos pelo mesmo endereço do Live Server.
+- Esta é uma versão de protótipo local. Não há notificações push quando o site está fechado.
+- O projeto utiliza Tailwind CDN, Font Awesome e Google Fonts externos para parte das classes, ícones e fontes; é necessária conexão com a internet para esses recursos.
