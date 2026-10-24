@@ -14,7 +14,7 @@ O TechAcademy reúne módulos que se comunicam por uma API central. A plataforma
 | API | Node.js + Express | Desenvolver |
 | Desktop | C# + Windows Forms | Desenvolver |
 | Mobile | Android | Desenvolver |
-| Banco de dados | A definir conforme o modelo do projeto | Documentar e integrar |
+| Banco de dados | SQL SERVER | Documentar e integrar |
 | Documentação | Markdown e diagramas UML | Em organização |
 
 ## Estrutura do repositório
