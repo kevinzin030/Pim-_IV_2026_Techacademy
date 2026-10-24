@@ -10,7 +10,7 @@ O TechAcademy reúne módulos que se comunicam por uma API central. A plataforma
 
 | Módulo | Tecnologia prevista | Situação inicial |
 |---|---|---|
-| Web | Projeto existente em [site-techacademy](https://github.com/kevinzin030/site-techacademy) | Reutilizar e adaptar |
+| Web |   HTML + CSS + JAVASCRIPT | Desenvolver |
 | API | Node.js + Express | Desenvolver |
 | Desktop | C# + Windows Forms | Desenvolver |
 | Mobile | Android | Desenvolver |
@@ -56,7 +56,7 @@ As pastas dos módulos serão preenchidas conforme o desenvolvimento avançar. O
 
 ## Prazo acadêmico
 
-**Entrega prevista: 14 de novembro de 2026.**
+**Entrega prevista: 22 de novembro de 2026.**
 
 ## Começando
 
