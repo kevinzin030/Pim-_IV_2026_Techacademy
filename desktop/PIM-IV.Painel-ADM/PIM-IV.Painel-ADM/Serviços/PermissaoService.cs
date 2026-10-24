@@ -1,21 +1,30 @@
-﻿
+﻿using System;
+using System.Data;
 using Microsoft.Data.SqlClient;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
-using System.Data;
 
 namespace PIM_IV.Painel_ADM.Servicos
 {
+    // Gerencia a consulta das permissões dos usuários e perfis.
     public class PermissaoService
     {
-        // Verifica se um usuario possui determinada permissao
+        private const int TamanhoCodigoPermissao = 100;
+
+        // Verifica se um usuário possui determinada permissão.
         public bool UsuarioTemPermissao(
             Usuario usuario,
             string codigoPermissao)
         {
-            if (usuario == null ||
-                !usuario.Ativo ||
+            if (!UsuarioValido(usuario) ||
                 string.IsNullOrWhiteSpace(codigoPermissao))
+            {
+                return false;
+            }
+
+            codigoPermissao = codigoPermissao.Trim();
+
+            if (codigoPermissao.Length > TamanhoCodigoPermissao)
             {
                 return false;
             }
@@ -35,16 +44,22 @@ namespace PIM_IV.Painel_ADM.Servicos
                   AND pm.Ativo = 1
                   AND pm.Codigo = @Codigo";
 
-            using SqlConnection conexao = Conexao.CriarConexao();
-            using SqlCommand comando = new(sql, conexao);
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
 
-            comando.Parameters.Add(
-                "@IdUsuario", SqlDbType.Int
-            ).Value = usuario.IdUsuario;
+            using SqlCommand comando =
+                new(sql, conexao);
 
-            comando.Parameters.Add(
-                "@Codigo", SqlDbType.NVarChar, 100
-            ).Value = codigoPermissao;
+            AdicionarParametroInteiro(
+                comando,
+                "@IdUsuario",
+                usuario.IdUsuario);
+
+            AdicionarParametroTexto(
+                comando,
+                "@Codigo",
+                codigoPermissao,
+                TamanhoCodigoPermissao);
 
             conexao.Open();
 
@@ -52,7 +67,15 @@ namespace PIM_IV.Painel_ADM.Servicos
                 comando.ExecuteScalar()) > 0;
         }
 
-        // Lista todas as permissoes cadastradas
+        // Confirma se o objeto representa um usuário ativo.
+        private static bool UsuarioValido(Usuario? usuario)
+        {
+            return usuario != null &&
+                   usuario.IdUsuario > 0 &&
+                   usuario.Ativo;
+        }
+
+        // Lista todas as permissões ativas do sistema.
         public DataTable ListarPermissoes()
         {
             const string sql = @"
@@ -63,24 +86,23 @@ namespace PIM_IV.Painel_ADM.Servicos
                     Plataforma
                 FROM dbo.Permissoes
                 WHERE Ativo = 1
-                ORDER BY Plataforma, Descricao";
+                ORDER BY
+                    Plataforma,
+                    Descricao";
 
-            using SqlConnection conexao = Conexao.CriarConexao();
-            using SqlCommand comando = new(sql, conexao);
-
-            conexao.Open();
-
-            using SqlDataReader leitor = comando.ExecuteReader();
-
-            DataTable tabela = new();
-            tabela.Load(leitor);
-
-            return tabela;
+            return ExecutarConsulta(sql);
         }
 
-        // Lista as permissoes atribuidas a um perfil
+        // Lista as permissões ativas atribuídas a um perfil.
         public DataTable ListarPermissoesDoPerfil(int idPerfil)
         {
+            if (idPerfil <= 0)
+            {
+                throw new ArgumentException(
+                    "O identificador do perfil é inválido.",
+                    nameof(idPerfil));
+            }
+
             const string sql = @"
                 SELECT
                     pm.IdPermissao,
@@ -92,23 +114,68 @@ namespace PIM_IV.Painel_ADM.Servicos
                     ON pp.IdPermissao = pm.IdPermissao
                 WHERE pp.IdPerfil = @IdPerfil
                   AND pm.Ativo = 1
-                ORDER BY pm.Plataforma, pm.Descricao";
+                ORDER BY
+                    pm.Plataforma,
+                    pm.Descricao";
 
-            using SqlConnection conexao = Conexao.CriarConexao();
-            using SqlCommand comando = new(sql, conexao);
+            return ExecutarConsulta(
+                sql,
+                comando =>
+                {
+                    AdicionarParametroInteiro(
+                        comando,
+                        "@IdPerfil",
+                        idPerfil);
+                });
+        }
 
-            comando.Parameters.Add(
-                "@IdPerfil", SqlDbType.Int
-            ).Value = idPerfil;
+        // Executa consultas SQL e retorna os resultados.
+        private static DataTable ExecutarConsulta(
+            string sql,
+            Action<SqlCommand>? configurarParametros = null)
+        {
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
+
+            using SqlCommand comando =
+                new(sql, conexao);
+
+            configurarParametros?.Invoke(comando);
 
             conexao.Open();
 
-            using SqlDataReader leitor = comando.ExecuteReader();
+            using SqlDataReader leitor =
+                comando.ExecuteReader();
 
             DataTable tabela = new();
+
             tabela.Load(leitor);
 
             return tabela;
+        }
+
+        // Adiciona um parâmetro numérico à consulta.
+        private static void AdicionarParametroInteiro(
+            SqlCommand comando,
+            string nome,
+            int valor)
+        {
+            comando.Parameters.Add(
+                nome,
+                SqlDbType.Int).Value = valor;
+        }
+
+        // Adiciona um parâmetro de texto à consulta.
+        private static void AdicionarParametroTexto(
+            SqlCommand comando,
+            string nome,
+            string valor,
+            int tamanho)
+        {
+            comando.Parameters.Add(
+                nome,
+                SqlDbType.NVarChar,
+                tamanho).Value = valor;
         }
     }
 }

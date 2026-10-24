@@ -1,146 +1,121 @@
-﻿
-using System;
+﻿using System;
 using System.Windows.Forms;
 using PIM_IV.Painel_ADM.Forms;
 
 namespace PIM_IV.Painel_ADM
 {
+    // Gerencia a navegação e o acesso aos módulos acadêmicos.
     public partial class FrmPainelPrincipal
     {
-        // =====================================================
-        // DISCIPLINAS - MÓDULO UNIFICADO
-        // =====================================================
+        private const int PerfilCoordenadorAcademico = 2;
 
+        private const string PermissaoDisciplinas =
+            "GERENCIAR_DISCIPLINAS";
+
+        private const string PermissaoMatriculas =
+            "GERENCIAR_MATRICULAS";
+
+        private const string PermissaoProfessores =
+            "ALOCAR_PROFESSORES";
+
+        // Direciona o gerenciamento para o módulo unificado.
         private void AbrirGerenciamentoDisciplinas()
         {
             AbrirDisciplinasUnificadas();
         }
 
+        // Direciona a vinculação para o mesmo módulo de disciplinas.
         private void AbrirVinculacaoDisciplinas()
         {
             AbrirDisciplinasUnificadas();
         }
 
+        // Abre o gerenciamento e a vinculação de disciplinas.
         private void AbrirDisciplinasUnificadas()
         {
-            if (_usuario.IdPerfil != 2)
-            {
-                MessageBox.Show(
-                    "O módulo de disciplinas é exclusivo do Coordenador.",
-                    "Acesso negado",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-
-                return;
-            }
-
-            if (!Autorizar("GERENCIAR_DISCIPLINAS"))
-                return;
-
-            try
-            {
-                FrmDisciplinas formulario =
-                    new FrmDisciplinas(_usuario);
-
-                ExibirFormularioCentral(formulario);
-
-                lblTituloPagina.Text = "Disciplinas";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Não foi possível abrir o módulo de disciplinas.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
+            AbrirModuloCoordenador(
+                "Disciplinas",
+                PermissaoDisciplinas,
+                "O módulo de disciplinas é exclusivo do Coordenador.",
+                "módulo de disciplinas",
+                () => new FrmDisciplinas(_usuario));
         }
 
-        // =====================================================
-        // GERENCIAMENTO DE MATRÍCULAS
-        // =====================================================
-
+        // Abre o gerenciamento de matrículas dos alunos.
         private void AbrirGerenciamentoMatriculas()
         {
-            if (_usuario.IdPerfil != 2)
-            {
-                MessageBox.Show(
-                    "O gerenciamento de matrículas é exclusivo do Coordenador.",
-                    "Acesso negado",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-
-                return;
-            }
-
-            if (!Autorizar("GERENCIAR_MATRICULAS"))
-                return;
-
-            try
-            {
-                FrmGerenciarMatriculas formulario =
-                    new FrmGerenciarMatriculas(_usuario);
-
-                ExibirFormularioCentral(formulario);
-
-                lblTituloPagina.Text = "Matrículas";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Não foi possível abrir o gerenciamento de matrículas.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
+            AbrirModuloCoordenador(
+                "Matrículas",
+                PermissaoMatriculas,
+                "O gerenciamento de matrículas é exclusivo do Coordenador.",
+                "gerenciamento de matrículas",
+                () => new FrmGerenciarMatriculas(_usuario));
         }
 
-        // =====================================================
-        // ALOCAÇÃO DE PROFESSORES
-        // =====================================================
-
+        // Abre a funcionalidade de alocação de professores.
         private void AbrirAlocacaoProfessores()
         {
-            if (_usuario.IdPerfil != 2)
-            {
-                MessageBox.Show(
-                    "A alocação de professores é exclusiva do Coordenador.",
-                    "Acesso negado",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+            AbrirModuloCoordenador(
+                "Professores",
+                PermissaoProfessores,
+                "A alocação de professores é exclusiva do Coordenador.",
+                "alocação de professores",
+                () => new FrmAlocarProfessores(_usuario));
+        }
 
+        // Centraliza a autorização e a abertura dos módulos acadêmicos.
+        private void AbrirModuloCoordenador(
+            string titulo,
+            string permissao,
+            string mensagemAcessoNegado,
+            string descricaoModulo,
+            Func<Form> criarFormulario)
+        {
+            if (!ValidarPerfilCoordenador(mensagemAcessoNegado))
+            {
                 return;
             }
 
-            if (!Autorizar("ALOCAR_PROFESSORES"))
+            if (!Autorizar(permissao))
+            {
                 return;
+            }
 
             try
             {
-                FrmAlocarProfessores formulario =
-                    new FrmAlocarProfessores(_usuario);
+                Form formulario = criarFormulario();
 
                 ExibirFormularioCentral(formulario);
 
-                lblTituloPagina.Text = "Professores";
+                lblTituloPagina.Text = titulo;
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Não foi possível abrir a alocação de professores.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ExibirErroModuloAcademico(
+                    descricaoModulo,
+                    ex);
             }
         }
 
-        // =====================================================
-        // DIRECIONAMENTO DOS MÓDULOS ACADÊMICOS
-        // =====================================================
+        // Impede o acesso de perfis diferentes do Coordenador.
+        private bool ValidarPerfilCoordenador(
+            string mensagemAcessoNegado)
+        {
+            if (_usuario.IdPerfil == PerfilCoordenadorAcademico)
+            {
+                return true;
+            }
 
+            MessageBox.Show(
+                mensagemAcessoNegado,
+                "Acesso negado",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return false;
+        }
+
+        // Direciona cada opção para sua funcionalidade correspondente.
         private void AbrirModuloAcademico(
             string nomeModulo,
             string permissao)
@@ -150,28 +125,47 @@ namespace PIM_IV.Painel_ADM
                 case "Disciplinas":
                 case "Vincular Disciplinas":
                     AbrirDisciplinasUnificadas();
-                    return;
+                    break;
 
                 case "Matrículas":
                     AbrirGerenciamentoMatriculas();
-                    return;
+                    break;
 
                 case "Professores":
                     AbrirAlocacaoProfessores();
-                    return;
+                    break;
 
                 case "Calendário":
-                    MessageBox.Show(
-                        "O Calendário Acadêmico foi retirado do projeto.",
-                        "Módulo indisponível",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-                    return;
+                    InformarCalendarioIndisponivel();
+                    break;
 
                 default:
                     MostrarModulo(nomeModulo, permissao);
-                    return;
+                    break;
             }
+        }
+
+        // Informa que o calendário não faz mais parte do projeto.
+        private static void InformarCalendarioIndisponivel()
+        {
+            MessageBox.Show(
+                "O Calendário Acadêmico foi retirado do projeto.",
+                "Módulo indisponível",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+        // Padroniza as mensagens de erro dos módulos acadêmicos.
+        private static void ExibirErroModuloAcademico(
+            string descricaoModulo,
+            Exception erro)
+        {
+            MessageBox.Show(
+                $"Não foi possível abrir o {descricaoModulo}.\n" +
+                erro.Message,
+                "Erro ao abrir módulo",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
     }
 }

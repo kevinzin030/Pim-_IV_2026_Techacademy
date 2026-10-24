@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using PIM_IV.Painel_ADM.Data;
@@ -8,26 +7,28 @@ using PIM_IV.Painel_ADM.Seguranca;
 
 namespace PIM_IV.Painel_ADM.Servicos
 {
+    // Gerencia a redefinição administrativa de senhas.
     public class RedefinicaoSenhaService
     {
+        private const int TamanhoHash = 500;
+        private const int TamanhoAcao = 100;
+        private const int TamanhoDescricao = 500;
+
+        // Redefine a senha e exige sua alteração no próximo acesso.
         public void RedefinirSenha(
             Usuario administrador,
             int idUsuario,
             string novaSenha)
         {
-            if (administrador == null)
-                throw new UnauthorizedAccessException(
-                    "Administrador não identificado.");
+            ValidarAdministrador(administrador);
+            ValidarUsuarioDestino(idUsuario);
 
-            if (administrador.IdPerfil != 1 ||
-                !administrador.Ativo)
-                throw new UnauthorizedAccessException(
-                    "Apenas administradores podem redefinir senhas.");
-
-            // Utiliza as mesmas regras do cadastro.
+            // Aplica as mesmas regras utilizadas no cadastro.
             UsuarioService.ValidarSenha(novaSenha);
 
-            using SqlConnection conexao = Conexao.CriarConexao();
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
+
             conexao.Open();
 
             using SqlTransaction transacao =
@@ -35,142 +36,242 @@ namespace PIM_IV.Painel_ADM.Servicos
 
             try
             {
-                const string sqlAdministrador = @"
-                    SELECT COUNT(1)
-                    FROM dbo.Usuarios u WITH (UPDLOCK, HOLDLOCK)
-                    INNER JOIN dbo.Perfis p
-                        ON p.IdPerfil = u.IdPerfil
-                    WHERE u.IdUsuario = @Administrador
-                      AND u.Ativo = 1
-                      AND p.NomePerfil = 'Administrador'
-                      AND p.Ativo = 1";
+                ConfirmarAdministradorNoBanco(
+                    conexao,
+                    transacao,
+                    administrador.IdUsuario);
 
-                using SqlCommand cmdAdministrador =
-                    new SqlCommand(
-                        sqlAdministrador,
-                        conexao,
-                        transacao);
+                string hashAtual = ConsultarHashAtual(
+                    conexao,
+                    transacao,
+                    idUsuario);
 
-                cmdAdministrador.Parameters.Add(
-                    "@Administrador",
-                    SqlDbType.Int
-                ).Value = administrador.IdUsuario;
-
-                int autorizado = Convert.ToInt32(
-                    cmdAdministrador.ExecuteScalar());
-
-                if (autorizado != 1)
-                    throw new UnauthorizedAccessException(
-                        "Sua conta não possui mais permissão de Administrador.");
-
-                // Confirma que a conta de destino existe
-                // e bloqueia a linha durante a alteração.
-                const string sqlConsultar = @"
-                    SELECT SenhaHash
-                    FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
-                    WHERE IdUsuario = @IdUsuario
-                      AND Ativo = 1";
-
-                using SqlCommand cmdConsultar =
-                    new SqlCommand(
-                        sqlConsultar,
-                        conexao,
-                        transacao);
-
-                cmdConsultar.Parameters.Add(
-                    "@IdUsuario",
-                    SqlDbType.Int
-                ).Value = idUsuario;
-
-                string? hashAtual =
-                    cmdConsultar.ExecuteScalar() as string;
-
-                if (hashAtual == null)
-                    throw new InvalidOperationException(
-                        "Usuário não encontrado ou desativado.");
-
-                if (SenhaHelper.VerificarSenha(
+                ValidarSenhaDiferente(
                     novaSenha,
-                    hashAtual))
-                    throw new ArgumentException(
-                        "A senha provisória deve ser diferente da senha atual.");
+                    hashAtual);
 
                 string novoHash =
                     SenhaHelper.GerarHash(novaSenha);
 
-                // Atualiza a senha e exige que o usuário
-                // escolha outra no próximo acesso.
-                const string sqlAtualizar = @"
-                    UPDATE dbo.Usuarios
-                    SET SenhaHash = @SenhaHash,
-                        DeveAlterarSenha = 1
-                    WHERE IdUsuario = @IdUsuario
-                      AND Ativo = 1";
+                AtualizarSenha(
+                    conexao,
+                    transacao,
+                    idUsuario,
+                    novoHash);
 
-                using SqlCommand cmdAtualizar =
-                    new SqlCommand(
-                        sqlAtualizar,
-                        conexao,
-                        transacao);
-
-                cmdAtualizar.Parameters.Add(
-                    "@SenhaHash",
-                    SqlDbType.NVarChar,
-                    500
-                ).Value = novoHash;
-
-                cmdAtualizar.Parameters.Add(
-                    "@IdUsuario",
-                    SqlDbType.Int
-                ).Value = idUsuario;
-
-                if (cmdAtualizar.ExecuteNonQuery() != 1)
-                    throw new InvalidOperationException(
-                        "Não foi possível redefinir a senha.");
-
-                // Registra a operação sem armazenar
-                // a senha provisória no histórico.
-                const string sqlAuditoria = @"
-                    INSERT INTO dbo.LogsAtividades
-                        (IdUsuario, Acao, Descricao)
-                    VALUES
-                        (@Administrador, @Acao, @Descricao)";
-
-                using SqlCommand cmdAuditoria =
-                    new SqlCommand(
-                        sqlAuditoria,
-                        conexao,
-                        transacao);
-
-                cmdAuditoria.Parameters.Add(
-                    "@Administrador",
-                    SqlDbType.Int
-                ).Value = administrador.IdUsuario;
-
-                cmdAuditoria.Parameters.Add(
-                    "@Acao",
-                    SqlDbType.NVarChar,
-                    100
-                ).Value = "REDEFINICAO_SENHA";
-
-                cmdAuditoria.Parameters.Add(
-                    "@Descricao",
-                    SqlDbType.NVarChar,
-                    500
-                ).Value =
-                    $"Administrador redefiniu a senha provisória " +
-                    $"do usuário ID {idUsuario}. " +
-                    $"Troca obrigatória no próximo acesso.";
-
-                cmdAuditoria.ExecuteNonQuery();
+                RegistrarAuditoria(
+                    conexao,
+                    transacao,
+                    administrador.IdUsuario,
+                    idUsuario);
 
                 transacao.Commit();
             }
             catch
             {
-                transacao.Rollback();
+                // Desfaz a alteração caso alguma etapa falhe.
+                if (transacao.Connection != null)
+                {
+                    transacao.Rollback();
+                }
+
                 throw;
             }
+        }
+
+        // Valida os dados do administrador da sessão.
+        private static void ValidarAdministrador(
+            Usuario administrador)
+        {
+            if (administrador == null)
+            {
+                throw new UnauthorizedAccessException(
+                    "Administrador não identificado.");
+            }
+
+            if (administrador.IdPerfil != 1 ||
+                !administrador.Ativo)
+            {
+                throw new UnauthorizedAccessException(
+                    "Apenas administradores podem redefinir senhas.");
+            }
+        }
+
+        // Verifica se o identificador do usuário é válido.
+        private static void ValidarUsuarioDestino(int idUsuario)
+        {
+            if (idUsuario <= 0)
+            {
+                throw new ArgumentException(
+                    "O identificador do usuário é inválido.",
+                    nameof(idUsuario));
+            }
+        }
+
+        // Confirma a autorização diretamente no banco de dados.
+        private static void ConfirmarAdministradorNoBanco(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idAdministrador)
+        {
+            const string sql = @"
+                SELECT COUNT(1)
+                FROM dbo.Usuarios u WITH (UPDLOCK, HOLDLOCK)
+                INNER JOIN dbo.Perfis p
+                    ON p.IdPerfil = u.IdPerfil
+                WHERE u.IdUsuario = @Administrador
+                  AND u.Ativo = 1
+                  AND p.NomePerfil = N'Administrador'
+                  AND p.Ativo = 1";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@Administrador",
+                SqlDbType.Int).Value = idAdministrador;
+
+            int autorizado = Convert.ToInt32(
+                comando.ExecuteScalar());
+
+            if (autorizado != 1)
+            {
+                throw new UnauthorizedAccessException(
+                    "Sua conta não possui mais permissão " +
+                    "de Administrador.");
+            }
+        }
+
+        // Consulta a senha atual e bloqueia o registro.
+        private static string ConsultarHashAtual(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idUsuario)
+        {
+            const string sql = @"
+                SELECT SenhaHash
+                FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
+                WHERE IdUsuario = @IdUsuario
+                  AND Ativo = 1";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@IdUsuario",
+                SqlDbType.Int).Value = idUsuario;
+
+            string? hashAtual =
+                comando.ExecuteScalar() as string;
+
+            if (hashAtual == null)
+            {
+                throw new InvalidOperationException(
+                    "Usuário não encontrado ou desativado.");
+            }
+
+            return hashAtual;
+        }
+
+        // Impede a reutilização da senha atual.
+        private static void ValidarSenhaDiferente(
+            string novaSenha,
+            string hashAtual)
+        {
+            bool senhaReutilizada =
+                SenhaHelper.VerificarSenha(
+                    novaSenha,
+                    hashAtual);
+
+            if (senhaReutilizada)
+            {
+                throw new ArgumentException(
+                    "A senha provisória deve ser " +
+                    "diferente da senha atual.");
+            }
+        }
+
+        // Atualiza o hash e marca a troca como obrigatória.
+        private static void AtualizarSenha(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idUsuario,
+            string novoHash)
+        {
+            const string sql = @"
+                UPDATE dbo.Usuarios
+                SET
+                    SenhaHash = @SenhaHash,
+                    DeveAlterarSenha = 1
+                WHERE IdUsuario = @IdUsuario
+                  AND Ativo = 1";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@SenhaHash",
+                SqlDbType.NVarChar,
+                TamanhoHash).Value = novoHash;
+
+            comando.Parameters.Add(
+                "@IdUsuario",
+                SqlDbType.Int).Value = idUsuario;
+
+            int registrosAlterados =
+                comando.ExecuteNonQuery();
+
+            if (registrosAlterados != 1)
+            {
+                throw new InvalidOperationException(
+                    "Não foi possível redefinir a senha.");
+            }
+        }
+
+        // Registra a operação sem armazenar a senha provisória.
+        private static void RegistrarAuditoria(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idAdministrador,
+            int idUsuario)
+        {
+            const string sql = @"
+                INSERT INTO dbo.LogsAtividades
+                (
+                    IdUsuario,
+                    Acao,
+                    Descricao
+                )
+                VALUES
+                (
+                    @Administrador,
+                    @Acao,
+                    @Descricao
+                )";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@Administrador",
+                SqlDbType.Int).Value = idAdministrador;
+
+            comando.Parameters.Add(
+                "@Acao",
+                SqlDbType.NVarChar,
+                TamanhoAcao).Value = "REDEFINICAO_SENHA";
+
+            string descricao =
+                $"Administrador redefiniu a senha provisória " +
+                $"do usuário ID {idUsuario}. " +
+                $"Troca obrigatória no próximo acesso.";
+
+            comando.Parameters.Add(
+                "@Descricao",
+                SqlDbType.NVarChar,
+                TamanhoDescricao).Value = descricao;
+
+            comando.ExecuteNonQuery();
         }
     }
 }

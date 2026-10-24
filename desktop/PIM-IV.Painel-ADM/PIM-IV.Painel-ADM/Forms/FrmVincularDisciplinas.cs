@@ -9,9 +9,12 @@ using System.Windows.Forms;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
-    // Gerencia a vinculação de disciplinas às turmas.
+    // Gerencia os vínculos entre turmas e disciplinas.
     public class FrmVincularDisciplinas : Form
     {
+        private const int PerfilCoordenador = 2;
+        private const string PermissaoDisciplinas = "GERENCIAR_DISCIPLINAS";
+
         private readonly Usuario _usuario;
         private readonly PermissaoService _permissaoService = new();
 
@@ -22,6 +25,7 @@ namespace PIM_IV.Painel_ADM.Forms
         private ComboBox cmbDisciplinas = null!;
         private ListBox lstDisciplinas = null!;
         private DataGridView dgvVinculos = null!;
+
         private Label lblOrientacao = null!;
         private Label lblQuantidade = null!;
 
@@ -29,61 +33,67 @@ namespace PIM_IV.Painel_ADM.Forms
         private Button btnDesvincular = null!;
         private Button btnAtualizar = null!;
 
-        private bool _carregando;
+        private bool _atualizandoDados;
 
-        // =====================================================
-        // CONSTRUTOR
-        // =====================================================
-
+        // Inicializa o formulário com o usuário autenticado.
         public FrmVincularDisciplinas(Usuario usuario)
         {
-            _usuario = usuario ??
-                throw new ArgumentNullException(nameof(usuario));
+            _usuario = usuario
+                ?? throw new ArgumentNullException(nameof(usuario));
 
-            Text = "PIM IV - Vinculação de Disciplinas às Turmas";
-            StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(1150, 800);
-            MinimumSize = new Size(950, 680);
-            BackColor = _fundo;
-            Font = new Font("Segoe UI", 10);
-
+            ConfigurarFormulario();
             CriarInterface();
+            ConfigurarEventos();
 
-            Shown += (_, _) =>
-            {
-                if (!VerificarAcesso())
-                {
-                    Close();
-                    return;
-                }
-
-                AtualizarDados();
-            };
+            Shown += AoExibirFormulario;
         }
 
-        // =====================================================
-        // PERMISSÕES
-        // =====================================================
+        // Define as propriedades principais da janela.
+        private void ConfigurarFormulario()
+        {
+            Text = "PIM IV - Vinculação de Disciplinas às Turmas";
+            StartPosition = FormStartPosition.CenterParent;
 
+            Size = new Size(1150, 800);
+            MinimumSize = new Size(950, 680);
+
+            BackColor = _fundo;
+            Font = new Font("Segoe UI", 10);
+        }
+
+        // Valida o acesso antes de carregar os dados.
+        private void AoExibirFormulario(object? sender, EventArgs e)
+        {
+            if (!VerificarAcesso())
+            {
+                Close();
+                return;
+            }
+
+            AtualizarDados();
+        }
+
+        // Verifica se o coordenador possui a permissão necessária.
         private bool VerificarAcesso()
         {
             try
             {
-                if (_usuario.IdPerfil != 2 ||
-                    !_permissaoService.UsuarioTemPermissao(
-                        _usuario, "GERENCIAR_DISCIPLINAS"))
+                bool autorizado =
+                    _usuario.IdPerfil == PerfilCoordenador &&
+                    _permissaoService.UsuarioTemPermissao(
+                        _usuario,
+                        PermissaoDisciplinas);
+
+                if (!autorizado)
                 {
-                    MessageBox.Show(
+                    ExibirMensagem(
                         "Somente coordenadores autorizados " +
                         "podem vincular disciplinas.",
                         "Acesso negado",
-                        MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
-
-                    return false;
                 }
 
-                return true;
+                return autorizado;
             }
             catch (Exception ex)
             {
@@ -92,11 +102,21 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // =====================================================
-        // CONSTRUÇÃO DA INTERFACE
-        // =====================================================
-
+        // Organiza as áreas principais da interface.
         private void CriarInterface()
+        {
+            TableLayoutPanel principal = CriarLayoutPrincipal();
+
+            Controls.Add(principal);
+
+            CriarCabecalho(principal);
+            CriarAreaSelecao(principal);
+            CriarAreaConteudo(principal);
+            CriarAreaBotoes(principal);
+        }
+
+        // Cria a estrutura principal do formulário.
+        private TableLayoutPanel CriarLayoutPrincipal()
         {
             TableLayoutPanel principal = new()
             {
@@ -107,10 +127,12 @@ namespace PIM_IV.Painel_ADM.Forms
                 BackColor = _fundo
             };
 
+            principal.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100));
+
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, 75));
 
-            // Área de seleção ampliada.
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, 125));
 
@@ -120,24 +142,30 @@ namespace PIM_IV.Painel_ADM.Forms
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, 70));
 
-            Controls.Add(principal);
+            return principal;
+        }
 
+        // Apresenta o título do módulo.
+        private void CriarCabecalho(TableLayoutPanel principal)
+        {
             Label titulo = new()
             {
                 Text = "Vinculação de Disciplinas às Turmas",
                 Dock = DockStyle.Fill,
                 Font = new Font(
-                    "Segoe UI", 19, FontStyle.Bold),
+                    "Segoe UI",
+                    19,
+                    FontStyle.Bold),
                 ForeColor = _azul,
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
             principal.Controls.Add(titulo, 0, 0);
+        }
 
-            // =================================================
-            // SELEÇÃO DE TURMA E DISCIPLINA
-            // =================================================
-
+        // Cria os campos de seleção de turma e disciplina.
+        private void CriarAreaSelecao(TableLayoutPanel principal)
+        {
             TableLayoutPanel selecao = new()
             {
                 Dock = DockStyle.Fill,
@@ -159,51 +187,41 @@ namespace PIM_IV.Painel_ADM.Forms
             selecao.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
-            principal.Controls.Add(selecao, 0, 1);
-
             selecao.Controls.Add(
                 CriarRotulo("Turma de destino"), 0, 0);
 
             selecao.Controls.Add(
                 CriarRotulo("Disciplina para vincular"), 1, 0);
 
-            // Campo ampliado para seleção da turma.
-            cmbTurmas = new ComboBox
-            {
-                Dock = DockStyle.Top,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 13),
-                IntegralHeight = false,
-                Height = 40,
-                Margin = new Padding(0, 8, 12, 0)
-            };
+            cmbTurmas = CriarCombo(
+                new Padding(0, 8, 12, 0));
 
-            // Campo ampliado para seleção da disciplina.
-            cmbDisciplinas = new ComboBox
-            {
-                Dock = DockStyle.Top,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 13),
-                IntegralHeight = false,
-                Height = 40,
-                Margin = new Padding(12, 8, 0, 0)
-            };
+            cmbDisciplinas = CriarCombo(
+                new Padding(12, 8, 0, 0));
 
             selecao.Controls.Add(cmbTurmas, 0, 1);
             selecao.Controls.Add(cmbDisciplinas, 1, 1);
 
-            cmbTurmas.SelectedIndexChanged += (_, _) =>
+            principal.Controls.Add(selecao, 0, 1);
+        }
+
+        // Padroniza os campos de seleção.
+        private static ComboBox CriarCombo(Padding margem)
+        {
+            return new ComboBox
             {
-                if (!_carregando)
-                {
-                    CarregarVinculos();
-                }
+                Dock = DockStyle.Top,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 13),
+                IntegralHeight = false,
+                Height = 40,
+                Margin = margem
             };
+        }
 
-            // =================================================
-            // ÁREA CENTRAL
-            // =================================================
-
+        // Divide o conteúdo entre disciplinas disponíveis e vinculadas.
+        private void CriarAreaConteudo(TableLayoutPanel principal)
+        {
             TableLayoutPanel conteudo = new()
             {
                 Dock = DockStyle.Fill,
@@ -218,34 +236,24 @@ namespace PIM_IV.Painel_ADM.Forms
             conteudo.ColumnStyles.Add(
                 new ColumnStyle(SizeType.Percent, 58));
 
-            principal.Controls.Add(conteudo, 0, 2);
-
-            // =================================================
-            // PAINEL ESQUERDO
-            // =================================================
-
-            TableLayoutPanel painelEsquerdo = new()
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 3,
-                Padding = new Padding(15),
-                Margin = new Padding(0, 0, 8, 0),
-                BackColor = Color.White
-            };
-
-            painelEsquerdo.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 40));
-
-            painelEsquerdo.RowStyles.Add(
+            conteudo.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
-            painelEsquerdo.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 65));
+            CriarPainelDisciplinasDisponiveis(conteudo);
+            CriarPainelDisciplinasVinculadas(conteudo);
 
-            conteudo.Controls.Add(painelEsquerdo, 0, 0);
+            principal.Controls.Add(conteudo, 0, 2);
+        }
 
-            painelEsquerdo.Controls.Add(
+        // Cria o painel das disciplinas disponíveis.
+        private void CriarPainelDisciplinasDisponiveis(
+            TableLayoutPanel conteudo)
+        {
+            TableLayoutPanel painel = CriarPainelConteudo(
+                new Padding(0, 0, 8, 0),
+                65);
+
+            painel.Controls.Add(
                 CriarRotulo("Disciplinas disponíveis"), 0, 0);
 
             lstDisciplinas = new ListBox
@@ -258,8 +266,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 Font = new Font("Segoe UI", 11)
             };
 
-            painelEsquerdo.Controls.Add(
-                lstDisciplinas, 0, 1);
+            painel.Controls.Add(lstDisciplinas, 0, 1);
 
             lblOrientacao = new Label
             {
@@ -271,37 +278,23 @@ namespace PIM_IV.Painel_ADM.Forms
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
-            painelEsquerdo.Controls.Add(
-                lblOrientacao, 0, 2);
+            painel.Controls.Add(lblOrientacao, 0, 2);
 
-            // =================================================
-            // PAINEL DIREITO
-            // =================================================
+            conteudo.Controls.Add(painel, 0, 0);
+        }
 
-            TableLayoutPanel painelDireito = new()
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 3,
-                Padding = new Padding(15),
-                Margin = new Padding(8, 0, 0, 0),
-                BackColor = Color.White
-            };
+        // Cria o painel das disciplinas vinculadas.
+        private void CriarPainelDisciplinasVinculadas(
+            TableLayoutPanel conteudo)
+        {
+            TableLayoutPanel painel = CriarPainelConteudo(
+                new Padding(8, 0, 0, 0),
+                40);
 
-            painelDireito.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 40));
-
-            painelDireito.RowStyles.Add(
-                new RowStyle(SizeType.Percent, 100));
-
-            painelDireito.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 40));
-
-            conteudo.Controls.Add(painelDireito, 1, 0);
-
-            painelDireito.Controls.Add(
-                CriarRotulo(
-                    "Disciplinas vinculadas à turma"), 0, 0);
+            painel.Controls.Add(
+                CriarRotulo("Disciplinas vinculadas à turma"),
+                0,
+                0);
 
             dgvVinculos = new DataGridView
             {
@@ -320,7 +313,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 AllowDrop = true
             };
 
-            painelDireito.Controls.Add(dgvVinculos, 0, 1);
+            painel.Controls.Add(dgvVinculos, 0, 1);
 
             lblQuantidade = new Label
             {
@@ -330,13 +323,44 @@ namespace PIM_IV.Painel_ADM.Forms
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
-            painelDireito.Controls.Add(
-                lblQuantidade, 0, 2);
+            painel.Controls.Add(lblQuantidade, 0, 2);
 
-            // =================================================
-            // BOTÕES
-            // =================================================
+            conteudo.Controls.Add(painel, 1, 0);
+        }
 
+        // Padroniza os painéis de disciplinas.
+        private static TableLayoutPanel CriarPainelConteudo(
+            Padding margem,
+            int alturaRodape)
+        {
+            TableLayoutPanel painel = new()
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Padding = new Padding(15),
+                Margin = margem,
+                BackColor = Color.White
+            };
+
+            painel.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100));
+
+            painel.RowStyles.Add(
+                new RowStyle(SizeType.Absolute, 40));
+
+            painel.RowStyles.Add(
+                new RowStyle(SizeType.Percent, 100));
+
+            painel.RowStyles.Add(
+                new RowStyle(SizeType.Absolute, alturaRodape));
+
+            return painel;
+        }
+
+        // Cria os botões responsáveis pelas operações.
+        private void CriarAreaBotoes(TableLayoutPanel principal)
+        {
             FlowLayoutPanel botoes = new()
             {
                 Dock = DockStyle.Fill,
@@ -346,38 +370,18 @@ namespace PIM_IV.Painel_ADM.Forms
                 Padding = new Padding(0, 10, 0, 0)
             };
 
-            principal.Controls.Add(botoes, 0, 3);
-
             btnAtualizar = CriarBotao("Atualizar", 130);
             btnDesvincular = CriarBotao("Desvincular", 155);
-            btnVincular = CriarBotao(
-                "Vincular disciplina", 190);
+            btnVincular = CriarBotao("Vincular disciplina", 190);
 
             botoes.Controls.Add(btnAtualizar);
             botoes.Controls.Add(btnDesvincular);
             botoes.Controls.Add(btnVincular);
 
-            btnAtualizar.Click += (_, _) =>
-                AtualizarDados();
-
-            btnVincular.Click += (_, _) =>
-                VincularDisciplina(
-                    ObterDisciplinaSelecionada());
-
-            btnDesvincular.Click += (_, _) =>
-                DesvincularDisciplina();
-
-            // Eventos de arrastar e soltar.
-            lstDisciplinas.MouseDown += IniciarArraste;
-            dgvVinculos.DragEnter += AoEntrarArraste;
-            dgvVinculos.DragOver += AoMoverArraste;
-            dgvVinculos.DragDrop += AoSoltarDisciplina;
+            principal.Controls.Add(botoes, 0, 3);
         }
 
-        // =====================================================
-        // COMPONENTES VISUAIS
-        // =====================================================
-
+        // Padroniza os rótulos utilizados no formulário.
         private Label CriarRotulo(string texto)
         {
             return new Label
@@ -385,14 +389,16 @@ namespace PIM_IV.Painel_ADM.Forms
                 Text = texto,
                 Dock = DockStyle.Fill,
                 Font = new Font(
-                    "Segoe UI", 10, FontStyle.Bold),
+                    "Segoe UI",
+                    10,
+                    FontStyle.Bold),
                 ForeColor = _azul,
                 TextAlign = ContentAlignment.MiddleLeft
             };
         }
 
-        private Button CriarBotao(
-            string texto, int largura)
+        // Padroniza os botões utilizados no formulário.
+        private Button CriarBotao(string texto, int largura)
         {
             Button botao = new()
             {
@@ -411,107 +417,112 @@ namespace PIM_IV.Painel_ADM.Forms
             return botao;
         }
 
-        // =====================================================
-        // CARREGAMENTO DE DADOS
-        // =====================================================
+        // Associa os controles aos métodos responsáveis.
+        private void ConfigurarEventos()
+        {
+            cmbTurmas.SelectedIndexChanged += (_, _) =>
+            {
+                if (!_atualizandoDados)
+                {
+                    CarregarVinculos();
+                }
+            };
 
+            btnAtualizar.Click += (_, _) =>
+                AtualizarDados();
+
+            btnVincular.Click += (_, _) =>
+                VincularDisciplina(
+                    ObterDisciplinaSelecionada());
+
+            btnDesvincular.Click += (_, _) =>
+                DesvincularDisciplina();
+
+            lstDisciplinas.MouseDown += IniciarArraste;
+
+            dgvVinculos.DragEnter += AoEntrarArraste;
+            dgvVinculos.DragOver += AoMoverArraste;
+            dgvVinculos.DragDrop += AoSoltarDisciplina;
+        }
+
+        // Atualiza as turmas e disciplinas disponíveis.
         private void AtualizarDados()
         {
+            int turmaAnterior = ObterIdSelecionado(cmbTurmas);
+            bool dadosCarregados = false;
+
             try
             {
-                _carregando = true;
-
-                int turmaAnterior =
-                    ObterIdSelecionado(cmbTurmas);
+                _atualizandoDados = true;
 
                 using SqlConnection conexao =
                     Conexao.CriarConexao();
 
                 conexao.Open();
 
-                const string sqlTurmas = @"
-                    SELECT
-                        IdTurma,
-                        CodigoTurma + ' - ' + NomeTurma
-                            AS NomeExibicao
-                    FROM dbo.Turmas
-                    WHERE Ativa = 1
-                    ORDER BY CodigoTurma";
+                DataTable turmas = ConsultarTurmas(conexao);
+                DataTable disciplinas = ConsultarDisciplinas(conexao);
 
-                const string sqlDisciplinas = @"
-                    SELECT
-                        IdDisciplina,
-                        CodigoDisciplina + ' - ' +
-                        NomeDisciplina AS NomeExibicao
-                    FROM dbo.Disciplinas
-                    WHERE Ativa = 1
-                    ORDER BY NomeDisciplina";
+                PreencherControles(
+                    turmas,
+                    disciplinas,
+                    turmaAnterior);
 
-                DataTable turmas =
-                    ConsultarTabela(conexao, sqlTurmas);
-
-                DataTable disciplinas =
-                    ConsultarTabela(conexao, sqlDisciplinas);
-
-                cmbTurmas.DataSource = turmas;
-                cmbTurmas.DisplayMember = "NomeExibicao";
-                cmbTurmas.ValueMember = "IdTurma";
-
-                cmbDisciplinas.DataSource =
-                    disciplinas.Copy();
-
-                cmbDisciplinas.DisplayMember =
-                    "NomeExibicao";
-
-                cmbDisciplinas.ValueMember =
-                    "IdDisciplina";
-
-                lstDisciplinas.DataSource = disciplinas;
-                lstDisciplinas.DisplayMember =
-                    "NomeExibicao";
-
-                lstDisciplinas.ValueMember =
-                    "IdDisciplina";
-
-                // Recupera a turma anteriormente selecionada.
-                if (turmaAnterior > 0)
-                {
-                    foreach (DataRowView item in
-                        cmbTurmas.Items)
-                    {
-                        if (Convert.ToInt32(
-                            item["IdTurma"]) == turmaAnterior)
-                        {
-                            cmbTurmas.SelectedItem = item;
-                            break;
-                        }
-                    }
-                }
-
-                if (lstDisciplinas.Items.Count > 0)
-                {
-                    lstDisciplinas.ClearSelected();
-                }
+                dadosCarregados = true;
             }
             catch (Exception ex)
             {
-                MostrarErro(
-                    "Erro ao carregar dados", ex);
+                MostrarErro("Erro ao carregar dados", ex);
             }
             finally
             {
-                _carregando = false;
+                _atualizandoDados = false;
             }
 
-            CarregarVinculos();
+            if (dadosCarregados)
+            {
+                CarregarVinculos();
+            }
         }
 
-        private DataTable ConsultarTabela(
+        // Consulta as turmas ativas.
+        private static DataTable ConsultarTurmas(
+            SqlConnection conexao)
+        {
+            const string sql = @"
+                SELECT
+                    IdTurma,
+                    CodigoTurma + ' - ' + NomeTurma
+                        AS NomeExibicao
+                FROM dbo.Turmas
+                WHERE Ativa = 1
+                ORDER BY CodigoTurma";
+
+            return ConsultarTabela(conexao, sql);
+        }
+
+        // Consulta as disciplinas ativas.
+        private static DataTable ConsultarDisciplinas(
+            SqlConnection conexao)
+        {
+            const string sql = @"
+                SELECT
+                    IdDisciplina,
+                    CodigoDisciplina + ' - ' +
+                        NomeDisciplina AS NomeExibicao
+                FROM dbo.Disciplinas
+                WHERE Ativa = 1
+                ORDER BY NomeDisciplina";
+
+            return ConsultarTabela(conexao, sql);
+        }
+
+        // Executa uma consulta SQL e retorna uma tabela.
+        private static DataTable ConsultarTabela(
             SqlConnection conexao,
             string sql)
         {
-            using SqlCommand comando =
-                new(sql, conexao);
+            using SqlCommand comando = new(sql, conexao);
 
             using SqlDataReader leitor =
                 comando.ExecuteReader();
@@ -522,107 +533,169 @@ namespace PIM_IV.Painel_ADM.Forms
             return tabela;
         }
 
-        private int ObterIdSelecionado(
-            ComboBox combo)
+        // Preenche os controles com os dados consultados.
+        private void PreencherControles(
+            DataTable turmas,
+            DataTable disciplinas,
+            int turmaAnterior)
         {
-            if (combo.SelectedValue is int id)
-            {
-                return id;
-            }
+            ConfigurarCombo(
+                cmbTurmas,
+                turmas,
+                "NomeExibicao",
+                "IdTurma");
 
-            return 0;
+            ConfigurarCombo(
+                cmbDisciplinas,
+                disciplinas.Copy(),
+                "NomeExibicao",
+                "IdDisciplina");
+
+            lstDisciplinas.DisplayMember = "NomeExibicao";
+            lstDisciplinas.ValueMember = "IdDisciplina";
+            lstDisciplinas.DataSource = disciplinas;
+
+            RestaurarTurmaSelecionada(turmaAnterior);
+
+            lstDisciplinas.ClearSelected();
         }
 
+        // Associa uma tabela aos campos de seleção.
+        private static void ConfigurarCombo(
+            ComboBox combo,
+            DataTable dados,
+            string campoExibicao,
+            string campoValor)
+        {
+            combo.DisplayMember = campoExibicao;
+            combo.ValueMember = campoValor;
+            combo.DataSource = dados;
+        }
+
+        // Mantém a turma selecionada após a atualização.
+        private void RestaurarTurmaSelecionada(int turmaAnterior)
+        {
+            if (turmaAnterior <= 0)
+            {
+                return;
+            }
+
+            cmbTurmas.SelectedValue = turmaAnterior;
+
+            if (cmbTurmas.SelectedIndex < 0 &&
+                cmbTurmas.Items.Count > 0)
+            {
+                cmbTurmas.SelectedIndex = 0;
+            }
+        }
+
+        // Obtém o identificador selecionado no ComboBox.
+        private static int ObterIdSelecionado(ComboBox combo)
+        {
+            return combo.SelectedValue is int id
+                ? id
+                : 0;
+        }
+
+        // Obtém a disciplina escolhida na lista ou no ComboBox.
         private int ObterDisciplinaSelecionada()
         {
-            // Prioriza a disciplina escolhida na lista.
             if (lstDisciplinas.Focused &&
-                lstDisciplinas.SelectedItem is
-                    DataRowView itemLista)
+                lstDisciplinas.SelectedItem is DataRowView disciplina)
             {
                 return Convert.ToInt32(
-                    itemLista["IdDisciplina"]);
+                    disciplina["IdDisciplina"]);
             }
 
             return ObterIdSelecionado(cmbDisciplinas);
         }
 
-        // =====================================================
-        // CONSULTA DOS VÍNCULOS
-        // =====================================================
-
+        // Consulta os vínculos ativos da turma selecionada.
         private void CarregarVinculos()
         {
-            int idTurma =
-                ObterIdSelecionado(cmbTurmas);
+            int idTurma = ObterIdSelecionado(cmbTurmas);
 
             if (idTurma <= 0)
             {
-                dgvVinculos.DataSource = null;
-                lblQuantidade.Text =
-                    "Selecione uma turma.";
-
+                LimparTabelaVinculos();
                 return;
             }
 
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                DataTable vinculos = ConsultarVinculos(idTurma);
 
-                conexao.Open();
-
-                const string sql = @"
-                    SELECT
-                        td.IdTurmaDisciplina,
-                        d.CodigoDisciplina AS Codigo,
-                        d.NomeDisciplina AS Disciplina,
-                        d.CargaHoraria AS CargaHoraria
-                    FROM dbo.TurmaDisciplinas td
-                    INNER JOIN dbo.Disciplinas d
-                        ON td.IdDisciplina = d.IdDisciplina
-                    WHERE td.IdTurma = @IdTurma
-                      AND td.Ativa = 1
-                    ORDER BY d.NomeDisciplina";
-
-                using SqlCommand comando =
-                    new(sql, conexao);
-
-                comando.Parameters.Add(
-                    "@IdTurma", SqlDbType.Int
-                ).Value = idTurma;
-
-                using SqlDataReader leitor =
-                    comando.ExecuteReader();
-
-                DataTable tabela = new();
-                tabela.Load(leitor);
-
-                dgvVinculos.DataSource = tabela;
-
-                if (dgvVinculos.Columns.Contains(
-                    "IdTurmaDisciplina"))
-                {
-                    dgvVinculos.Columns[
-                        "IdTurmaDisciplina"]!.Visible = false;
-                }
-
-                dgvVinculos.ClearSelection();
-
-                lblQuantidade.Text =
-                    $"Disciplinas vinculadas: {tabela.Rows.Count}";
+                AtualizarTabelaVinculos(vinculos);
             }
             catch (Exception ex)
             {
-                MostrarErro(
-                    "Erro ao consultar vínculos", ex);
+                MostrarErro("Erro ao consultar vínculos", ex);
             }
         }
 
-        // =====================================================
-        // ARRASTAR E SOLTAR
-        // =====================================================
+        // Consulta as disciplinas vinculadas à turma.
+        private static DataTable ConsultarVinculos(int idTurma)
+        {
+            const string sql = @"
+                SELECT
+                    td.IdTurmaDisciplina,
+                    d.CodigoDisciplina AS Codigo,
+                    d.NomeDisciplina AS Disciplina,
+                    d.CargaHoraria AS CargaHoraria
+                FROM dbo.TurmaDisciplinas td
+                INNER JOIN dbo.Disciplinas d
+                    ON td.IdDisciplina = d.IdDisciplina
+                WHERE td.IdTurma = @IdTurma
+                  AND td.Ativa = 1
+                ORDER BY d.NomeDisciplina";
 
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
+
+            using SqlCommand comando =
+                new(sql, conexao);
+
+            comando.Parameters.Add(
+                "@IdTurma",
+                SqlDbType.Int).Value = idTurma;
+
+            conexao.Open();
+
+            using SqlDataReader leitor =
+                comando.ExecuteReader();
+
+            DataTable tabela = new();
+            tabela.Load(leitor);
+
+            return tabela;
+        }
+
+        // Atualiza a tabela e a quantidade de vínculos.
+        private void AtualizarTabelaVinculos(DataTable vinculos)
+        {
+            dgvVinculos.DataSource = vinculos;
+
+            if (dgvVinculos.Columns.Contains("IdTurmaDisciplina"))
+            {
+                dgvVinculos.Columns["IdTurmaDisciplina"]!
+                    .Visible = false;
+            }
+
+            dgvVinculos.ClearSelection();
+
+            lblQuantidade.Text =
+                $"Disciplinas vinculadas: {vinculos.Rows.Count}";
+        }
+
+        // Limpa a tabela quando não há turma selecionada.
+        private void LimparTabelaVinculos()
+        {
+            dgvVinculos.DataSource = null;
+
+            lblQuantidade.Text = "Selecione uma turma.";
+        }
+
+        // Inicia o arraste de uma disciplina da lista.
         private void IniciarArraste(
             object? sender,
             MouseEventArgs e)
@@ -632,8 +705,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
-            int indice =
-                lstDisciplinas.IndexFromPoint(e.Location);
+            int indice = lstDisciplinas.IndexFromPoint(e.Location);
 
             if (indice < 0 ||
                 indice >= lstDisciplinas.Items.Count)
@@ -641,12 +713,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
-            if (lstDisciplinas.Items[indice] is
-                DataRowView item)
+            if (lstDisciplinas.Items[indice] is DataRowView disciplina)
             {
-                int idDisciplina =
-                    Convert.ToInt32(
-                        item["IdDisciplina"]);
+                int idDisciplina = Convert.ToInt32(
+                    disciplina["IdDisciplina"]);
 
                 lstDisciplinas.DoDragDrop(
                     idDisciplina,
@@ -654,17 +724,21 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
+        // Verifica se o objeto arrastado é uma disciplina válida.
         private void AoEntrarArraste(
             object? sender,
             DragEventArgs e)
         {
-            e.Effect =
+            bool disciplinaValida =
                 e.Data != null &&
-                e.Data.GetDataPresent(typeof(int))
-                    ? DragDropEffects.Copy
-                    : DragDropEffects.None;
+                e.Data.GetDataPresent(typeof(int));
+
+            e.Effect = disciplinaValida
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
         }
 
+        // Mantém o indicador visual durante o arraste.
         private void AoMoverArraste(
             object? sender,
             DragEventArgs e)
@@ -672,312 +746,382 @@ namespace PIM_IV.Painel_ADM.Forms
             AoEntrarArraste(sender, e);
         }
 
+        // Vincula a disciplina solta sobre a tabela.
         private void AoSoltarDisciplina(
             object? sender,
             DragEventArgs e)
         {
-            if (e.Data?.GetData(typeof(int))
-                is int idDisciplina)
+            if (e.Data?.GetData(typeof(int)) is int idDisciplina)
             {
                 VincularDisciplina(idDisciplina);
             }
         }
 
-        // =====================================================
-        // VINCULAR DISCIPLINA
-        // =====================================================
-
-        private void VincularDisciplina(
-            int idDisciplina)
+        // Vincula uma disciplina à turma selecionada.
+        private void VincularDisciplina(int idDisciplina)
         {
-            int idTurma =
-                ObterIdSelecionado(cmbTurmas);
+            int idTurma = ObterIdSelecionado(cmbTurmas);
 
-            if (idTurma <= 0 ||
-                idDisciplina <= 0)
+            if (!ValidarSelecao(idTurma, idDisciplina))
             {
-                MessageBox.Show(
-                    "Selecione uma turma e uma disciplina.",
-                    "Dados necessários",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-
                 return;
             }
 
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
-
-                conexao.Open();
-
-                using SqlTransaction transacao =
-                    conexao.BeginTransaction();
-
-                try
-                {
-                    ExigirAutorizacao(
-                        conexao, transacao);
-
-                    // Verifica se turma e disciplina estão ativas.
-                    const string sqlValidar = @"
-                        SELECT
-                            CASE WHEN EXISTS (
-                                SELECT 1
-                                FROM dbo.Turmas
-                                WHERE IdTurma = @IdTurma
-                                  AND Ativa = 1
-                            )
-                            AND EXISTS (
-                                SELECT 1
-                                FROM dbo.Disciplinas
-                                WHERE IdDisciplina = @IdDisciplina
-                                  AND Ativa = 1
-                            )
-                            THEN 1 ELSE 0 END";
-
-                    using (SqlCommand validar = new(
-                        sqlValidar,
-                        conexao,
-                        transacao))
+                int resultado = ExecutarTransacao(
+                    (conexao, transacao) =>
                     {
-                        AdicionarIds(
-                            validar,
+                        ValidarTurmaEDisciplina(
+                            conexao,
+                            transacao,
                             idTurma,
                             idDisciplina);
 
-                        if (Convert.ToInt32(
-                            validar.ExecuteScalar()) != 1)
+                        int resultadoVinculo = ExecutarVinculacao(
+                            conexao,
+                            transacao,
+                            idTurma,
+                            idDisciplina);
+
+                        if (resultadoVinculo == 1)
                         {
-                            throw new InvalidOperationException(
-                                "A turma ou disciplina está " +
-                                "inativa ou não existe.");
+                            RegistrarAuditoria(
+                                conexao,
+                                transacao,
+                                "VINCULAR_DISCIPLINA",
+                                $"Disciplina {idDisciplina} " +
+                                $"vinculada à turma {idTurma}.");
                         }
-                    }
 
-                    // Evita duplicação e reativa vínculo antigo.
-                    const string sql = @"
-                        IF EXISTS (
-                            SELECT 1
-                            FROM dbo.TurmaDisciplinas
-                                WITH (UPDLOCK, HOLDLOCK)
-                            WHERE IdTurma = @IdTurma
-                              AND IdDisciplina = @IdDisciplina
-                              AND Ativa = 1
-                        )
-                        BEGIN
-                            SELECT 0;
-                        END
-                        ELSE IF EXISTS (
-                            SELECT 1
-                            FROM dbo.TurmaDisciplinas
-                                WITH (UPDLOCK, HOLDLOCK)
-                            WHERE IdTurma = @IdTurma
-                              AND IdDisciplina = @IdDisciplina
-                        )
-                        BEGIN
-                            UPDATE dbo.TurmaDisciplinas
-                            SET Ativa = 1,
-                                DataVinculo = SYSDATETIME()
-                            WHERE IdTurma = @IdTurma
-                              AND IdDisciplina = @IdDisciplina;
+                        return resultadoVinculo;
+                    });
 
-                            SELECT 1;
-                        END
-                        ELSE
-                        BEGIN
-                            INSERT INTO dbo.TurmaDisciplinas
-                                (
-                                    IdTurma,
-                                    IdDisciplina,
-                                    Ativa,
-                                    DataVinculo
-                                )
-                            VALUES
-                                (
-                                    @IdTurma,
-                                    @IdDisciplina,
-                                    1,
-                                    SYSDATETIME()
-                                );
-
-                            SELECT 1;
-                        END";
-
-                    int resultado;
-
-                    using (SqlCommand comando = new(
-                        sql, conexao, transacao))
-                    {
-                        AdicionarIds(
-                            comando,
-                            idTurma,
-                            idDisciplina);
-
-                        resultado = Convert.ToInt32(
-                            comando.ExecuteScalar());
-                    }
-
-                    if (resultado == 0)
-                    {
-                        transacao.Commit();
-
-                        MessageBox.Show(
-                            "Esta disciplina já está " +
-                            "vinculada à turma.",
-                            "Vínculo existente",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information);
-
-                        return;
-                    }
-
-                    RegistrarAuditoria(
-                        conexao,
-                        transacao,
-                        "VINCULAR_DISCIPLINA",
-                        $"Disciplina {idDisciplina} " +
-                        $"vinculada à turma {idTurma}.");
-
-                    transacao.Commit();
-
-                    MessageBox.Show(
-                        "Disciplina vinculada com sucesso!",
-                        "Sucesso",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-                }
-                catch
+                if (resultado == 0)
                 {
-                    transacao.Rollback();
-                    throw;
+                    ExibirMensagem(
+                        "Esta disciplina já está vinculada à turma.",
+                        "Vínculo existente",
+                        MessageBoxIcon.Information);
+
+                    return;
                 }
+
+                ExibirMensagem(
+                    "Disciplina vinculada com sucesso!",
+                    "Sucesso",
+                    MessageBoxIcon.Information);
 
                 CarregarVinculos();
             }
             catch (Exception ex)
             {
-                MostrarErro(
-                    "Erro ao vincular disciplina", ex);
+                MostrarErro("Erro ao vincular disciplina", ex);
             }
         }
 
-        // =====================================================
-        // DESVINCULAR DISCIPLINA
-        // =====================================================
+        // Verifica se uma turma e uma disciplina foram selecionadas.
+        private static bool ValidarSelecao(
+            int idTurma,
+            int idDisciplina)
+        {
+            if (idTurma > 0 && idDisciplina > 0)
+            {
+                return true;
+            }
 
+            ExibirMensagem(
+                "Selecione uma turma e uma disciplina.",
+                "Dados necessários",
+                MessageBoxIcon.Information);
+
+            return false;
+        }
+
+        // Confirma se a turma e a disciplina estão ativas.
+        private static void ValidarTurmaEDisciplina(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idTurma,
+            int idDisciplina)
+        {
+            const string sql = @"
+                SELECT
+                    CASE WHEN EXISTS
+                    (
+                        SELECT 1
+                        FROM dbo.Turmas
+                        WHERE IdTurma = @IdTurma
+                          AND Ativa = 1
+                    )
+                    AND EXISTS
+                    (
+                        SELECT 1
+                        FROM dbo.Disciplinas
+                        WHERE IdDisciplina = @IdDisciplina
+                          AND Ativa = 1
+                    )
+                    THEN 1 ELSE 0 END";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            AdicionarIds(
+                comando,
+                idTurma,
+                idDisciplina);
+
+            bool dadosValidos =
+                Convert.ToInt32(comando.ExecuteScalar()) == 1;
+
+            if (!dadosValidos)
+            {
+                throw new InvalidOperationException(
+                    "A turma ou disciplina está inativa ou não existe.");
+            }
+        }
+
+        // Cria, reativa ou identifica um vínculo existente.
+        private static int ExecutarVinculacao(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idTurma,
+            int idDisciplina)
+        {
+            const string sql = @"
+                IF EXISTS
+                (
+                    SELECT 1
+                    FROM dbo.TurmaDisciplinas
+                        WITH (UPDLOCK, HOLDLOCK)
+                    WHERE IdTurma = @IdTurma
+                      AND IdDisciplina = @IdDisciplina
+                      AND Ativa = 1
+                )
+                BEGIN
+                    SELECT 0;
+                END
+                ELSE IF EXISTS
+                (
+                    SELECT 1
+                    FROM dbo.TurmaDisciplinas
+                        WITH (UPDLOCK, HOLDLOCK)
+                    WHERE IdTurma = @IdTurma
+                      AND IdDisciplina = @IdDisciplina
+                )
+                BEGIN
+                    UPDATE dbo.TurmaDisciplinas
+                    SET
+                        Ativa = 1,
+                        DataVinculo = SYSDATETIME()
+                    WHERE IdTurma = @IdTurma
+                      AND IdDisciplina = @IdDisciplina;
+
+                    SELECT 1;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO dbo.TurmaDisciplinas
+                    (
+                        IdTurma,
+                        IdDisciplina,
+                        Ativa,
+                        DataVinculo
+                    )
+                    VALUES
+                    (
+                        @IdTurma,
+                        @IdDisciplina,
+                        1,
+                        SYSDATETIME()
+                    );
+
+                    SELECT 1;
+                END";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            AdicionarIds(
+                comando,
+                idTurma,
+                idDisciplina);
+
+            return Convert.ToInt32(comando.ExecuteScalar());
+        }
+
+        // Desativa o vínculo selecionado sem excluir seu histórico.
         private void DesvincularDisciplina()
         {
-            if (dgvVinculos.SelectedRows.Count == 0)
+            if (!TentarObterVinculoSelecionado(
+                out int idVinculo,
+                out string nomeDisciplina))
             {
-                MessageBox.Show(
-                    "Selecione uma disciplina " +
-                    "vinculada na tabela.",
+                return;
+            }
+
+            int idTurma = ObterIdSelecionado(cmbTurmas);
+
+            if (idTurma <= 0)
+            {
+                ExibirMensagem(
+                    "Selecione uma turma válida.",
                     "Seleção necessária",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
 
                 return;
+            }
+
+            if (!ConfirmarDesvinculacao(nomeDisciplina))
+            {
+                return;
+            }
+
+            try
+            {
+                ExecutarTransacao(
+                    (conexao, transacao) =>
+                    {
+                        DesativarVinculo(
+                            conexao,
+                            transacao,
+                            idVinculo,
+                            idTurma);
+
+                        RegistrarAuditoria(
+                            conexao,
+                            transacao,
+                            "DESVINCULAR_DISCIPLINA",
+                            $"Vínculo acadêmico {idVinculo} desativado.");
+
+                        return true;
+                    });
+
+                ExibirMensagem(
+                    "Disciplina desvinculada com sucesso!",
+                    "Sucesso",
+                    MessageBoxIcon.Information);
+
+                CarregarVinculos();
+            }
+            catch (Exception ex)
+            {
+                MostrarErro("Erro ao desvincular disciplina", ex);
+            }
+        }
+
+        // Obtém os dados do vínculo selecionado na tabela.
+        private bool TentarObterVinculoSelecionado(
+            out int idVinculo,
+            out string nomeDisciplina)
+        {
+            idVinculo = 0;
+            nomeDisciplina = string.Empty;
+
+            if (dgvVinculos.SelectedRows.Count == 0)
+            {
+                ExibirMensagem(
+                    "Selecione uma disciplina vinculada na tabela.",
+                    "Seleção necessária",
+                    MessageBoxIcon.Information);
+
+                return false;
             }
 
             DataGridViewRow linha =
                 dgvVinculos.SelectedRows[0];
 
-            int idVinculo = Convert.ToInt32(
-                linha.Cells[
-                    "IdTurmaDisciplina"].Value);
+            idVinculo = Convert.ToInt32(
+                linha.Cells["IdTurmaDisciplina"].Value);
 
-            string disciplina =
-                Convert.ToString(
-                    linha.Cells["Disciplina"].Value) ?? "";
+            nomeDisciplina = Convert.ToString(
+                linha.Cells["Disciplina"].Value) ?? string.Empty;
 
-            if (MessageBox.Show(
-                $"Deseja desvincular '{disciplina}' desta turma?",
+            return true;
+        }
+
+        // Solicita confirmação antes de desvincular.
+        private static bool ConfirmarDesvinculacao(
+            string nomeDisciplina)
+        {
+            DialogResult resposta = MessageBox.Show(
+                $"Deseja desvincular '{nomeDisciplina}' desta turma?",
                 "Confirmar desvinculação",
                 MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question) != DialogResult.Yes)
+                MessageBoxIcon.Question);
+
+            return resposta == DialogResult.Yes;
+        }
+
+        // Desativa um vínculo existente no banco de dados.
+        private static void DesativarVinculo(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idVinculo,
+            int idTurma)
+        {
+            const string sql = @"
+                UPDATE dbo.TurmaDisciplinas
+                SET Ativa = 0
+                WHERE IdTurmaDisciplina = @IdVinculo
+                  AND IdTurma = @IdTurma
+                  AND Ativa = 1";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@IdVinculo",
+                SqlDbType.Int).Value = idVinculo;
+
+            comando.Parameters.Add(
+                "@IdTurma",
+                SqlDbType.Int).Value = idTurma;
+
+            int registrosAlterados =
+                comando.ExecuteNonQuery();
+
+            if (registrosAlterados != 1)
             {
-                return;
-            }
-
-            try
-            {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
-
-                conexao.Open();
-
-                using SqlTransaction transacao =
-                    conexao.BeginTransaction();
-
-                try
-                {
-                    ExigirAutorizacao(
-                        conexao, transacao);
-
-                    const string sql = @"
-                        UPDATE dbo.TurmaDisciplinas
-                        SET Ativa = 0
-                        WHERE IdTurmaDisciplina = @IdVinculo
-                          AND IdTurma = @IdTurma
-                          AND Ativa = 1";
-
-                    using SqlCommand comando =
-                        new(sql, conexao, transacao);
-
-                    comando.Parameters.Add(
-                        "@IdVinculo", SqlDbType.Int
-                    ).Value = idVinculo;
-
-                    comando.Parameters.Add(
-                        "@IdTurma", SqlDbType.Int
-                    ).Value = ObterIdSelecionado(
-                        cmbTurmas);
-
-                    int alterados =
-                        comando.ExecuteNonQuery();
-
-                    if (alterados == 0)
-                    {
-                        throw new InvalidOperationException(
-                            "O vínculo não está mais ativo.");
-                    }
-
-                    RegistrarAuditoria(
-                        conexao,
-                        transacao,
-                        "DESVINCULAR_DISCIPLINA",
-                        $"Vínculo acadêmico {idVinculo} " +
-                        "desativado.");
-
-                    transacao.Commit();
-                }
-                catch
-                {
-                    transacao.Rollback();
-                    throw;
-                }
-
-                MessageBox.Show(
-                    "Disciplina desvinculada com sucesso!",
-                    "Sucesso",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-
-                CarregarVinculos();
-            }
-            catch (Exception ex)
-            {
-                MostrarErro(
-                    "Erro ao desvincular disciplina", ex);
+                throw new InvalidOperationException(
+                    "O vínculo não está mais ativo.");
             }
         }
 
-        // =====================================================
-        // AUTORIZAÇÃO NO BANCO DE DADOS
-        // =====================================================
+        // Executa a operação e a auditoria em uma transação.
+        private T ExecutarTransacao<T>(
+            Func<SqlConnection, SqlTransaction, T> operacao)
+        {
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
 
+            conexao.Open();
+
+            using SqlTransaction transacao =
+                conexao.BeginTransaction(IsolationLevel.Serializable);
+
+            try
+            {
+                ExigirAutorizacao(conexao, transacao);
+
+                T resultado = operacao(conexao, transacao);
+
+                transacao.Commit();
+
+                return resultado;
+            }
+            catch
+            {
+                if (transacao.Connection != null)
+                {
+                    transacao.Rollback();
+                }
+
+                throw;
+            }
+        }
+
+        // Revalida a autorização diretamente no banco.
         private void ExigirAutorizacao(
             SqlConnection conexao,
             SqlTransaction transacao)
@@ -992,50 +1136,54 @@ namespace PIM_IV.Painel_ADM.Forms
                 INNER JOIN dbo.Permissoes pm
                     ON pp.IdPermissao = pm.IdPermissao
                 WHERE u.IdUsuario = @IdUsuario
-                  AND u.IdPerfil = 2
+                  AND u.IdPerfil = @IdPerfil
                   AND u.Ativo = 1
                   AND p.Ativo = 1
-                  AND pm.Codigo = 'GERENCIAR_DISCIPLINAS'
+                  AND pm.Codigo = @CodigoPermissao
                   AND pm.Ativo = 1";
 
             using SqlCommand comando =
                 new(sql, conexao, transacao);
 
             comando.Parameters.Add(
-                "@IdUsuario", SqlDbType.Int
-            ).Value = _usuario.IdUsuario;
+                "@IdUsuario",
+                SqlDbType.Int).Value = _usuario.IdUsuario;
 
-            if (Convert.ToInt32(
-                comando.ExecuteScalar()) == 0)
+            comando.Parameters.Add(
+                "@IdPerfil",
+                SqlDbType.Int).Value = PerfilCoordenador;
+
+            comando.Parameters.Add(
+                "@CodigoPermissao",
+                SqlDbType.VarChar,
+                100).Value = PermissaoDisciplinas;
+
+            bool autorizado =
+                Convert.ToInt32(comando.ExecuteScalar()) > 0;
+
+            if (!autorizado)
             {
                 throw new UnauthorizedAccessException(
-                    "Você não possui autorização " +
-                    "para esta operação.");
+                    "Você não possui autorização para esta operação.");
             }
         }
 
-        // =====================================================
-        // PARÂMETROS SQL
-        // =====================================================
-
-        private void AdicionarIds(
+        // Adiciona os identificadores utilizados nas consultas SQL.
+        private static void AdicionarIds(
             SqlCommand comando,
             int idTurma,
             int idDisciplina)
         {
             comando.Parameters.Add(
-                "@IdTurma", SqlDbType.Int
-            ).Value = idTurma;
+                "@IdTurma",
+                SqlDbType.Int).Value = idTurma;
 
             comando.Parameters.Add(
-                "@IdDisciplina", SqlDbType.Int
-            ).Value = idDisciplina;
+                "@IdDisciplina",
+                SqlDbType.Int).Value = idDisciplina;
         }
 
-        // =====================================================
-        // AUDITORIA
-        // =====================================================
-
+        // Registra a operação na mesma transação dos dados.
         private void RegistrarAuditoria(
             SqlConnection conexao,
             SqlTransaction transacao,
@@ -1044,48 +1192,59 @@ namespace PIM_IV.Painel_ADM.Forms
         {
             const string sql = @"
                 INSERT INTO dbo.LogsAtividades
-                    (
-                        IdUsuario,
-                        Acao,
-                        Descricao
-                    )
+                (
+                    IdUsuario,
+                    Acao,
+                    Descricao
+                )
                 VALUES
-                    (
-                        @IdUsuario,
-                        @Acao,
-                        @Descricao
-                    )";
+                (
+                    @IdUsuario,
+                    @Acao,
+                    @Descricao
+                )";
 
             using SqlCommand comando =
                 new(sql, conexao, transacao);
 
             comando.Parameters.Add(
-                "@IdUsuario", SqlDbType.Int
-            ).Value = _usuario.IdUsuario;
+                "@IdUsuario",
+                SqlDbType.Int).Value = _usuario.IdUsuario;
 
             comando.Parameters.Add(
-                "@Acao", SqlDbType.NVarChar, 100
-            ).Value = acao;
+                "@Acao",
+                SqlDbType.NVarChar,
+                100).Value = acao;
 
             comando.Parameters.Add(
-                "@Descricao", SqlDbType.NVarChar, 500
-            ).Value = descricao;
+                "@Descricao",
+                SqlDbType.NVarChar,
+                500).Value = descricao;
 
             comando.ExecuteNonQuery();
         }
 
-        // =====================================================
-        // TRATAMENTO DE ERROS
-        // =====================================================
+        // Exibe mensagens padronizadas.
+        private static void ExibirMensagem(
+            string mensagem,
+            string titulo,
+            MessageBoxIcon icone)
+        {
+            MessageBox.Show(
+                mensagem,
+                titulo,
+                MessageBoxButtons.OK,
+                icone);
+        }
 
-        private void MostrarErro(
+        // Centraliza a apresentação de erros.
+        private static void MostrarErro(
             string titulo,
             Exception ex)
         {
-            MessageBox.Show(
+            ExibirMensagem(
                 ex.Message,
                 titulo,
-                MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
     }

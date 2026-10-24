@@ -1,15 +1,24 @@
+using System;
+using System.Windows.Forms;
 
 namespace PIM_IV.Painel_ADM
 {
+    // Define o ponto de entrada da aplicação.
     internal static class Program
     {
         [STAThread]
-        static void Main()
+        private static void Main()
         {
-            // Inicializa as configuracoes do Windows Forms
+            // Inicializa as configurações do Windows Forms.
             ApplicationConfiguration.Initialize();
 
-            // Abre a tela de login
+            // Inicia a aplicação pela tela de login.
+            IniciarAplicacao();
+        }
+
+        // Centraliza a inicialização da interface principal.
+        private static void IniciarAplicacao()
+        {
             Application.Run(new FrmLogin());
         }
     }

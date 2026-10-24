@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
@@ -9,166 +8,114 @@ using PIM_IV.Painel_ADM.Servicos;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
+    // Gerencia o cadastro de novos usuários do sistema.
     public partial class FrmCadastrarUsuario : Form
     {
+        private const int PerfilAdministrador = 1;
+
         private readonly Usuario _administrador;
         private readonly UsuarioService _usuarioService = new();
-        private readonly UsuarioRepository _repositorio = new();
+        private readonly UsuarioRepository _usuarioRepository = new();
+
+        private readonly Color _corFundo = Color.FromArgb(244, 247, 251);
+        private readonly Color _corTitulo = Color.FromArgb(24, 39, 65);
+        private readonly Color _corBotao = Color.FromArgb(40, 92, 170);
 
         private TextBox txtNome = null!;
         private TextBox txtLogin = null!;
         private TextBox txtSenha = null!;
         private TextBox txtConfirmarSenha = null!;
+
         private ComboBox cmbPerfil = null!;
+
         private Button btnSalvar = null!;
+
         private Label lblLogin = null!;
         private Label lblOrientacao = null!;
 
+        // Inicializa o formulário e valida o administrador autenticado.
         public FrmCadastrarUsuario(Usuario administrador)
         {
             InitializeComponent();
 
-            _administrador = administrador;
+            _administrador = administrador
+                ?? throw new ArgumentNullException(nameof(administrador));
 
-            if (_administrador.IdPerfil != 1 ||
+            ValidarAdministrador();
+            ConfigurarFormulario();
+            CriarLayout();
+            CarregarPerfis();
+        }
+
+        // Restringe o cadastro aos administradores ativos.
+        private void ValidarAdministrador()
+        {
+            if (_administrador.IdPerfil != PerfilAdministrador ||
                 !_administrador.Ativo)
             {
                 throw new UnauthorizedAccessException(
                     "Acesso permitido somente ao Administrador.");
             }
+        }
 
+        // Define as propriedades visuais do formulário.
+        private void ConfigurarFormulario()
+        {
             Text = "Cadastrar Usuário";
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
+
             ClientSize = new Size(540, 590);
+
             MaximizeBox = false;
             MinimizeBox = false;
-            BackColor = Color.FromArgb(244, 247, 251);
 
-            CriarLayout();
-            CarregarPerfis();
+            BackColor = _corFundo;
         }
 
+        // Cria e organiza os campos de cadastro.
         private void CriarLayout()
         {
             Controls.Clear();
 
-            Label lblTitulo = new()
-            {
-                Text = "Cadastrar novo usuário",
-                Font = new Font(
-                    "Segoe UI", 20, FontStyle.Bold),
-                ForeColor = Color.FromArgb(24, 39, 65),
-                Location = new Point(30, 20),
-                AutoSize = true
-            };
+            Label lblTitulo = CriarLabel(
+                "Cadastrar novo usuário", 30, 20);
 
-            Label lblNome = new()
-            {
-                Text = "Nome completo",
-                Location = new Point(30, 85),
-                AutoSize = true
-            };
+            lblTitulo.Font = new Font(
+                "Segoe UI", 20, FontStyle.Bold);
 
-            txtNome = new TextBox
-            {
-                Location = new Point(30, 108),
-                Width = 470,
-                Font = new Font("Segoe UI", 11),
-                MaxLength = 150
-            };
+            lblTitulo.ForeColor = _corTitulo;
 
-            Label lblPerfil = new()
-            {
-                Text = "Perfil de acesso",
-                Location = new Point(30, 155),
-                AutoSize = true
-            };
+            Label lblNome = CriarLabel(
+                "Nome completo", 30, 85);
 
-            cmbPerfil = new ComboBox
-            {
-                Location = new Point(30, 178),
-                Width = 470,
-                DropDownStyle =
-                    ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 11)
-            };
+            txtNome = CriarTextBox(30, 108, 150);
 
-            lblLogin = new Label
-            {
-                Text = "Login / Identificador",
-                Location = new Point(30, 225),
-                AutoSize = true
-            };
+            Label lblPerfil = CriarLabel(
+                "Perfil de acesso", 30, 155);
 
-            txtLogin = new TextBox
-            {
-                Location = new Point(30, 248),
-                Width = 470,
-                Font = new Font("Segoe UI", 11),
-                MaxLength = 100
-            };
+            cmbPerfil = CriarComboBoxPerfil();
 
-            Label lblSenha = new()
-            {
-                Text = "Senha inicial",
-                Location = new Point(30, 295),
-                AutoSize = true
-            };
+            lblLogin = CriarLabel(
+                "Login / Identificador", 30, 225);
 
-            txtSenha = new TextBox
-            {
-                Location = new Point(30, 318),
-                Width = 470,
-                Font = new Font("Segoe UI", 11),
-                UseSystemPasswordChar = true,
-                MaxLength = 128
-            };
+            txtLogin = CriarTextBox(30, 248, 100);
 
-            Label lblConfirmarSenha = new()
-            {
-                Text = "Confirmar senha",
-                Location = new Point(30, 365),
-                AutoSize = true
-            };
+            Label lblSenha = CriarLabel(
+                "Senha inicial", 30, 295);
 
-            txtConfirmarSenha = new TextBox
-            {
-                Location = new Point(30, 388),
-                Width = 470,
-                Font = new Font("Segoe UI", 11),
-                UseSystemPasswordChar = true,
-                MaxLength = 128
-            };
+            txtSenha = CriarTextBox(30, 318, 128);
+            txtSenha.UseSystemPasswordChar = true;
 
-            lblOrientacao = new Label
-            {
-                Text = "A senha deve conter no mínimo 8 caracteres, " +
-                       "incluindo maiúscula, minúscula, " +
-                       "número e símbolo.",
-                Location = new Point(30, 440),
-                Size = new Size(470, 55),
-                ForeColor = Color.DimGray,
-                Font = new Font("Segoe UI", 9)
-            };
+            Label lblConfirmarSenha = CriarLabel(
+                "Confirmar senha", 30, 365);
 
-            btnSalvar = new Button
-            {
-                Text = "Cadastrar usuário",
-                Location = new Point(300, 515),
-                Size = new Size(200, 42),
-                BackColor = Color.FromArgb(40, 92, 170),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
+            txtConfirmarSenha = CriarTextBox(30, 388, 128);
+            txtConfirmarSenha.UseSystemPasswordChar = true;
 
-            btnSalvar.FlatAppearance.BorderSize = 0;
+            lblOrientacao = CriarOrientacaoSenha();
 
-            btnSalvar.Click += BtnSalvar_Click;
-
-            cmbPerfil.SelectedIndexChanged +=
-                (s, e) => AtualizarCamposPerfil();
+            btnSalvar = CriarBotaoSalvar();
 
             Controls.AddRange(new Control[]
             {
@@ -190,16 +137,99 @@ namespace PIM_IV.Painel_ADM.Forms
             AcceptButton = btnSalvar;
         }
 
+        // Cria o campo de seleção do perfil.
+        private ComboBox CriarComboBoxPerfil()
+        {
+            ComboBox comboBox = new()
+            {
+                Location = new Point(30, 178),
+                Width = 470,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 11)
+            };
+
+            comboBox.SelectedIndexChanged +=
+                (_, _) => AtualizarCamposPerfil();
+
+            return comboBox;
+        }
+
+        // Exibe as orientações de segurança da senha.
+        private static Label CriarOrientacaoSenha()
+        {
+            return new Label
+            {
+                Text =
+                    "A senha deve conter no mínimo 8 caracteres, " +
+                    "incluindo maiúscula, minúscula, número e símbolo.",
+
+                Location = new Point(30, 440),
+                Size = new Size(470, 55),
+                ForeColor = Color.DimGray,
+                Font = new Font("Segoe UI", 9)
+            };
+        }
+
+        // Cria o botão responsável pelo cadastro.
+        private Button CriarBotaoSalvar()
+        {
+            Button botao = new()
+            {
+                Text = "Cadastrar usuário",
+                Location = new Point(300, 515),
+                Size = new Size(200, 42),
+                BackColor = _corBotao,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+
+            botao.FlatAppearance.BorderSize = 0;
+            botao.Click += BtnSalvar_Click;
+
+            return botao;
+        }
+
+        // Cria rótulos padronizados.
+        private static Label CriarLabel(
+            string texto,
+            int posicaoX,
+            int posicaoY)
+        {
+            return new Label
+            {
+                Text = texto,
+                Location = new Point(posicaoX, posicaoY),
+                AutoSize = true
+            };
+        }
+
+        // Cria campos de texto padronizados.
+        private static TextBox CriarTextBox(
+            int posicaoX,
+            int posicaoY,
+            int tamanhoMaximo)
+        {
+            return new TextBox
+            {
+                Location = new Point(posicaoX, posicaoY),
+                Width = 470,
+                Font = new Font("Segoe UI", 11),
+                MaxLength = tamanhoMaximo
+            };
+        }
+
+        // Consulta os perfis cadastrados no banco.
         private void CarregarPerfis()
         {
             try
             {
-                DataTable perfis =
-                    _repositorio.ListarPerfis();
+                DataTable perfis = _usuarioRepository.ListarPerfis();
 
                 cmbPerfil.DisplayMember = "NomePerfil";
                 cmbPerfil.ValueMember = "IdPerfil";
                 cmbPerfil.DataSource = perfis;
+
                 cmbPerfil.SelectedIndex = -1;
 
                 AtualizarCamposPerfil();
@@ -208,107 +238,87 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 btnSalvar.Enabled = false;
 
-                MessageBox.Show(
+                ExibirMensagem(
                     "Não foi possível carregar os perfis.\n\n" +
                     ex.Message,
                     "Erro de consulta",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
         }
 
+        // Ajusta o campo de login conforme o perfil escolhido.
         private void AtualizarCamposPerfil()
         {
             if (cmbPerfil.SelectedItem is not DataRowView linha)
             {
-                txtLogin.Enabled = false;
-                txtLogin.Text = "";
-                txtLogin.PlaceholderText = "";
-                lblLogin.Text = "Login / Identificador";
+                LimparConfiguracaoLogin();
                 return;
             }
 
-            string perfil =
-                linha["NomePerfil"].ToString() ?? "";
+            string nomePerfil =
+                Convert.ToString(linha["NomePerfil"]) ?? "";
 
-            txtLogin.Text = "";
+            txtLogin.Clear();
 
-            if (perfil == "Administrador")
+            if (nomePerfil == "Administrador")
             {
-                txtLogin.Enabled = true;
-                txtLogin.PlaceholderText =
-                    "Exemplo: admin.max";
-
-                lblLogin.Text =
-                    "Login do Administrador";
+                ConfigurarLoginAdministrador();
             }
             else
             {
-                txtLogin.Enabled = false;
-
-                string prefixo = perfil switch
-                {
-                    "Aluno" => "RA",
-                    "Professor" => "RP",
-                    "Coordenador" => "RC",
-                    _ => ""
-                };
-
-                lblLogin.Text =
-                    prefixo + " automático";
-
-                txtLogin.PlaceholderText =
-                    "Gerado após o cadastro";
+                ConfigurarLoginAutomatico(nomePerfil);
             }
         }
 
+        // Limpa o campo quando nenhum perfil está selecionado.
+        private void LimparConfiguracaoLogin()
+        {
+            txtLogin.Enabled = false;
+            txtLogin.Clear();
+            txtLogin.PlaceholderText = "";
+
+            lblLogin.Text = "Login / Identificador";
+        }
+
+        // Permite um login personalizado para administradores.
+        private void ConfigurarLoginAdministrador()
+        {
+            txtLogin.Enabled = true;
+            txtLogin.PlaceholderText = "Exemplo: admin.max";
+
+            lblLogin.Text = "Login do Administrador";
+        }
+
+        // Exibe o identificador automático de cada perfil.
+        private void ConfigurarLoginAutomatico(string nomePerfil)
+        {
+            txtLogin.Enabled = false;
+
+            string prefixo = nomePerfil switch
+            {
+                "Aluno" => "RA",
+                "Professor" => "RP",
+                "Coordenador" => "RC",
+                _ => ""
+            };
+
+            lblLogin.Text = prefixo + " automático";
+            txtLogin.PlaceholderText = "Gerado após o cadastro";
+        }
+
+        // Valida os campos e solicita o cadastro ao serviço.
         private void BtnSalvar_Click(
             object? sender,
             EventArgs e)
         {
-            if (cmbPerfil.SelectedValue is not int idPerfil)
+            if (!ValidarCampos(out int idPerfil))
             {
-                MessageBox.Show(
-                    "Selecione um perfil de acesso.",
-                    "Validação",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(txtNome.Text))
-            {
-                MessageBox.Show(
-                    "Informe o nome completo.",
-                    "Validação",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (idPerfil == 1 &&
-                string.IsNullOrWhiteSpace(txtLogin.Text))
-            {
-                MessageBox.Show(
-                    "Informe o login do Administrador.",
-                    "Validação",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (txtSenha.Text != txtConfirmarSenha.Text)
-            {
-                MessageBox.Show(
-                    "As senhas informadas não coincidem.",
-                    "Validação",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
                 return;
             }
 
             try
             {
+                // A complexidade da senha é validada pelo serviço.
                 UsuarioService.ValidarSenha(txtSenha.Text);
 
                 btnSalvar.Enabled = false;
@@ -321,12 +331,11 @@ namespace PIM_IV.Painel_ADM.Forms
                         txtSenha.Text,
                         idPerfil);
 
-                MessageBox.Show(
+                ExibirMensagem(
                     "Usuário cadastrado com sucesso!\n\n" +
                     "Login / Identificador: " + loginGerado +
                     "\n\nA senha foi definida pelo Administrador.",
                     "Cadastro concluído",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
 
                 DialogResult = DialogResult.OK;
@@ -334,34 +343,98 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (ArgumentException ex)
             {
-                MessageBox.Show(
+                ExibirMensagem(
                     ex.Message,
                     "Dados inválidos",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
             }
             catch (UnauthorizedAccessException ex)
             {
-                MessageBox.Show(
+                ExibirMensagem(
                     ex.Message,
                     "Acesso negado",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
+                ExibirMensagem(
                     "Não foi possível cadastrar o usuário.\n\n" +
-                    "Detalhes técnicos:\n" +
-                    ex.ToString(),
+                    "Detalhes técnicos:\n" + ex,
                     "Erro no cadastro",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
             finally
             {
                 btnSalvar.Enabled = true;
             }
+        }
+
+        // Verifica os campos obrigatórios antes do cadastro.
+        private bool ValidarCampos(out int idPerfil)
+        {
+            idPerfil = 0;
+
+            if (cmbPerfil.SelectedValue is not int perfilSelecionado)
+            {
+                ExibirMensagem(
+                    "Selecione um perfil de acesso.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
+
+                cmbPerfil.Focus();
+                return false;
+            }
+
+            idPerfil = perfilSelecionado;
+
+            if (string.IsNullOrWhiteSpace(txtNome.Text))
+            {
+                ExibirMensagem(
+                    "Informe o nome completo.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
+
+                txtNome.Focus();
+                return false;
+            }
+
+            if (idPerfil == PerfilAdministrador &&
+                string.IsNullOrWhiteSpace(txtLogin.Text))
+            {
+                ExibirMensagem(
+                    "Informe o login do Administrador.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
+
+                txtLogin.Focus();
+                return false;
+            }
+
+            if (txtSenha.Text != txtConfirmarSenha.Text)
+            {
+                ExibirMensagem(
+                    "As senhas informadas não coincidem.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
+
+                txtConfirmarSenha.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
+        // Exibe mensagens padronizadas ao usuário.
+        private static void ExibirMensagem(
+            string mensagem,
+            string titulo,
+            MessageBoxIcon icone)
+        {
+            MessageBox.Show(
+                mensagem,
+                titulo,
+                MessageBoxButtons.OK,
+                icone);
         }
     }
 }

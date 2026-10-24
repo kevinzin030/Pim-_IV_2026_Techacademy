@@ -1,575 +1,485 @@
-﻿
-using System;
-using System.Data;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-using PIM_IV.Painel_ADM.Modelos;
-using PIM_IV.Painel_ADM.Repositorios;
 using PIM_IV.Painel_ADM.Servicos;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
-    public partial class FrmGerenciarUsuarios : Form
+    // Complementa o formulário principal com a redefinição de senhas.
+    public partial class FrmGerenciarUsuarios
     {
-        private readonly Usuario _usuarioLogado;
-        private readonly UsuarioRepository _repositorio = new();
-        private readonly UsuarioService _usuarioService = new();
+        private Button? btnRedefinirSenha;
 
-        private DataGridView dgvUsuarios = null!;
-        private TextBox txtPesquisa = null!;
-        private Button btnNovo = null!;
-        private Button btnEditar = null!;
-        private Button btnStatus = null!;
-        private Button btnAtualizar = null!;
-        private Label lblQuantidade = null!;
+        private static readonly Color CorPrincipal =
+            Color.FromArgb(40, 92, 170);
 
-        private DataTable? _dadosUsuarios;
-
-        public FrmGerenciarUsuarios(Usuario usuarioLogado)
+        // Adiciona o botão de redefinição quando o formulário é exibido.
+        protected override void OnShown(EventArgs e)
         {
-            InitializeComponent();
+            base.OnShown(e);
 
-            _usuarioLogado = usuarioLogado;
-
-            if (_usuarioLogado.IdPerfil != 1 ||
-                !_usuarioLogado.Ativo)
+            if (btnRedefinirSenha != null)
             {
-                throw new UnauthorizedAccessException(
-                    "Acesso permitido somente ao Administrador.");
+                return;
             }
 
-            Text = "Gerenciamento de Usuários";
-            StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(1100, 700);
-            MinimumSize = new Size(900, 600);
-            BackColor = Color.FromArgb(244, 247, 251);
-
-            CriarLayout();
-            CarregarUsuarios();
+            AdicionarBotaoRedefinicao();
         }
 
-        private void CriarLayout()
+        // Cria o botão responsável por iniciar a redefinição.
+        private void AdicionarBotaoRedefinicao()
         {
-            Controls.Clear();
-
-            Label titulo = new()
+            btnRedefinirSenha = new Button
             {
-                Text = "Gerenciamento de Usuários",
-                Font = new Font("Segoe UI", 22, FontStyle.Bold),
-                ForeColor = Color.FromArgb(24, 39, 65),
-                Location = new Point(30, 25),
-                AutoSize = true
-            };
-
-            Label subtitulo = new()
-            {
-                Text = "Cadastre, consulte e gerencie as contas do sistema.",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.DimGray,
-                Location = new Point(32, 75),
-                AutoSize = true
-            };
-
-            txtPesquisa = new TextBox
-            {
-                Location = new Point(30, 130),
-                Size = new Size(430, 34),
-                Font = new Font("Segoe UI", 11),
-                PlaceholderText = "Pesquisar por nome, login ou perfil..."
-            };
-
-            txtPesquisa.TextChanged +=
-                (s, e) => FiltrarUsuarios();
-
-            btnNovo = CriarBotao(
-                "+ Novo usuário",
-                new Point(865, 125),
-                new Size(190, 42),
-                Color.FromArgb(40, 92, 170));
-
-            btnNovo.Anchor =
-                AnchorStyles.Top | AnchorStyles.Right;
-
-            btnNovo.Click += BtnNovo_Click;
-
-            dgvUsuarios = new DataGridView
-            {
-                Location = new Point(30, 195),
-                Size = new Size(1025, 365),
-                Anchor = AnchorStyles.Top |
-                         AnchorStyles.Bottom |
-                         AnchorStyles.Left |
-                         AnchorStyles.Right,
-                BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.None,
-                ReadOnly = true,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false,
-                MultiSelect = false,
-                SelectionMode =
-                    DataGridViewSelectionMode.FullRowSelect,
-                AutoSizeColumnsMode =
-                    DataGridViewAutoSizeColumnsMode.Fill,
-                RowHeadersVisible = false,
-                RowTemplate = { Height = 36 },
-                Font = new Font("Segoe UI", 10)
-            };
-
-            dgvUsuarios.EnableHeadersVisualStyles = false;
-
-            dgvUsuarios.ColumnHeadersDefaultCellStyle.BackColor =
-                Color.FromArgb(32, 55, 88);
-
-            dgvUsuarios.ColumnHeadersDefaultCellStyle.ForeColor =
-                Color.White;
-
-            dgvUsuarios.ColumnHeadersHeight = 42;
-
-            dgvUsuarios.ColumnHeadersHeightSizeMode =
-                DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-
-            btnEditar = CriarBotao(
-                "Editar usuário",
-                new Point(30, 585),
-                new Size(170, 42),
-                Color.FromArgb(40, 92, 170));
-
-            btnEditar.Anchor =
-                AnchorStyles.Bottom | AnchorStyles.Left;
-
-            btnEditar.Click += BtnEditar_Click;
-
-            btnStatus = CriarBotao(
-                "Ativar / Desativar",
-                new Point(215, 585),
-                new Size(180, 42),
-                Color.FromArgb(92, 105, 120));
-
-            btnStatus.Anchor =
-                AnchorStyles.Bottom | AnchorStyles.Left;
-
-            btnStatus.Click += BtnStatus_Click;
-
-            btnAtualizar = CriarBotao(
-                "Atualizar lista",
-                new Point(410, 585),
-                new Size(165, 42),
-                Color.FromArgb(92, 105, 120));
-
-            btnAtualizar.Anchor =
-                AnchorStyles.Bottom | AnchorStyles.Left;
-
-            btnAtualizar.Click +=
-                (s, e) => CarregarUsuarios();
-
-            lblQuantidade = new Label
-            {
-                Text = "Usuários: 0",
-                Location = new Point(790, 595),
-                Size = new Size(265, 25),
-                TextAlign = ContentAlignment.MiddleRight,
-                ForeColor = Color.DimGray,
-                Anchor =
-                    AnchorStyles.Bottom | AnchorStyles.Right
-            };
-
-            Controls.AddRange(new Control[]
-            {
-                titulo,
-                subtitulo,
-                txtPesquisa,
-                btnNovo,
-                dgvUsuarios,
-                btnEditar,
-                btnStatus,
-                btnAtualizar,
-                lblQuantidade
-            });
-        }
-
-        private static Button CriarBotao(
-            string texto,
-            Point localizacao,
-            Size tamanho,
-            Color cor)
-        {
-            Button botao = new()
-            {
-                Text = texto,
-                Location = localizacao,
-                Size = tamanho,
-                BackColor = cor,
+                Name = "btnRedefinirSenha",
+                Text = "Redefinir senha",
+                Size = new Size(180, 42),
+                BackColor = CorPrincipal,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Font = new Font(
-                    "Segoe UI", 10, FontStyle.Bold)
+                UseVisualStyleBackColor = false
             };
 
-            botao.FlatAppearance.BorderSize = 0;
+            btnRedefinirSenha.FlatAppearance.BorderSize = 0;
 
-            return botao;
-        }
+            btnRedefinirSenha.Click += (_, _) =>
+                AbrirRedefinicaoSenha();
 
-        private void CarregarUsuarios()
-        {
-            try
+            Button? botaoAtualizar =
+                LocalizarBotaoAtualizar(this);
+
+            if (botaoAtualizar?.Parent != null)
             {
-                _dadosUsuarios = _repositorio.ListarTodos();
-
-                dgvUsuarios.DataSource = _dadosUsuarios;
-
-                ConfigurarColunas();
-                FiltrarUsuarios();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Não foi possível carregar os usuários.\n\n" +
-                    ex.Message,
-                    "Erro de consulta",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
-        }
-
-        private void ConfigurarColunas()
-        {
-            if (dgvUsuarios.Columns.Contains("IdUsuario"))
-            {
-                dgvUsuarios.Columns["IdUsuario"]!.HeaderText =
-                    "ID";
-
-                dgvUsuarios.Columns["IdUsuario"]!.FillWeight = 35;
-            }
-
-            if (dgvUsuarios.Columns.Contains("NomeCompleto"))
-            {
-                dgvUsuarios.Columns["NomeCompleto"]!.HeaderText =
-                    "Nome completo";
-
-                dgvUsuarios.Columns["NomeCompleto"]!.FillWeight = 160;
-            }
-
-            if (dgvUsuarios.Columns.Contains("Login"))
-            {
-                dgvUsuarios.Columns["Login"]!.HeaderText =
-                    "Login / Identificador";
-
-                dgvUsuarios.Columns["Login"]!.FillWeight = 105;
-            }
-
-            if (dgvUsuarios.Columns.Contains("NomePerfil"))
-            {
-                dgvUsuarios.Columns["NomePerfil"]!.HeaderText =
-                    "Perfil";
-
-                dgvUsuarios.Columns["NomePerfil"]!.FillWeight = 85;
-            }
-
-            if (dgvUsuarios.Columns.Contains("IdPerfil"))
-            {
-                dgvUsuarios.Columns["IdPerfil"]!.Visible = false;
-            }
-
-            if (dgvUsuarios.Columns.Contains("Ativo"))
-            {
-                dgvUsuarios.Columns["Ativo"]!.HeaderText =
-                    "Ativo";
-
-                dgvUsuarios.Columns["Ativo"]!.FillWeight = 45;
-            }
-
-            if (dgvUsuarios.Columns.Contains("DataCadastro"))
-            {
-                dgvUsuarios.Columns["DataCadastro"]!.HeaderText =
-                    "Data do cadastro";
-
-                dgvUsuarios.Columns["DataCadastro"]!
-                    .DefaultCellStyle.Format = "dd/MM/yyyy HH:mm";
-
-                dgvUsuarios.Columns["DataCadastro"]!.FillWeight = 110;
-            }
-        }
-
-        private void FiltrarUsuarios()
-        {
-            if (_dadosUsuarios == null)
-                return;
-
-            string pesquisa = txtPesquisa.Text.Trim();
-
-            DataView visao = _dadosUsuarios.DefaultView;
-
-            if (string.IsNullOrWhiteSpace(pesquisa))
-            {
-                visao.RowFilter = "";
+                PosicionarBotaoJuntoAoAtualizar(botaoAtualizar);
             }
             else
             {
-                string valor = pesquisa
-                    .Replace("'", "''")
-                    .Replace("[", "[[]")
-                    .Replace("%", "[%]")
-                    .Replace("*", "[*]");
-
-                visao.RowFilter =
-                    $"NomeCompleto LIKE '%{valor}%' OR " +
-                    $"Login LIKE '%{valor}%' OR " +
-                    $"NomePerfil LIKE '%{valor}%'";
+                CriarPainelAlternativoRedefinicao();
             }
-
-            lblQuantidade.Text =
-                $"Usuários: {visao.Count}";
         }
 
-        // Metodo utilizado pelas operacoes de gerenciamento
-        private int? ObterUsuarioSelecionado()
+        // Posiciona o botão ao lado da opção Atualizar lista.
+        private void PosicionarBotaoJuntoAoAtualizar(
+            Button botaoAtualizar)
         {
-            if (dgvUsuarios.CurrentRow == null ||
-                dgvUsuarios.CurrentRow.IsNewRow)
+            Control container = botaoAtualizar.Parent!;
+
+            container.Controls.Add(btnRedefinirSenha!);
+
+            btnRedefinirSenha!.Anchor =
+                AnchorStyles.Bottom | AnchorStyles.Left;
+
+            AtualizarPosicaoBotaoRedefinicao(botaoAtualizar);
+
+            container.Resize += (_, _) =>
+                AtualizarPosicaoBotaoRedefinicao(botaoAtualizar);
+        }
+
+        // Reposiciona o botão quando o tamanho da janela muda.
+        private void AtualizarPosicaoBotaoRedefinicao(
+            Button botaoReferencia)
+        {
+            if (btnRedefinirSenha == null ||
+                btnRedefinirSenha.IsDisposed ||
+                botaoReferencia.IsDisposed)
             {
-                MessageBox.Show(
-                    "Selecione um usuário na lista.",
-                    "Seleção necessária",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-
-                return null;
+                return;
             }
 
-            object? valor =
-                dgvUsuarios.CurrentRow.Cells["IdUsuario"].Value;
+            Control? container = botaoReferencia.Parent;
 
-            if (valor == null || valor == DBNull.Value)
-                return null;
-
-            return Convert.ToInt32(valor);
-        }
-
-        // Compatibilidade com FrmGerenciarUsuarios.Redefinicao.cs
-        private int? ObterSelecionado()
-        {
-            return ObterUsuarioSelecionado();
-        }
-
-        private void BtnNovo_Click(object? sender, EventArgs e)
-        {
-            try
+            if (container == null)
             {
-                using FrmCadastrarUsuario formulario =
-                    new(_usuarioLogado);
-
-                if (formulario.ShowDialog(this) == DialogResult.OK)
-                    CarregarUsuarios();
+                return;
             }
-            catch (Exception ex)
+
+            const int espacamento = 14;
+
+            btnRedefinirSenha.Height =
+                botaoReferencia.Height;
+
+            btnRedefinirSenha.Location = new Point(
+                botaoReferencia.Right + espacamento,
+                botaoReferencia.Top);
+
+            if (container is ScrollableControl painel)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "Não foi possível abrir o cadastro",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                painel.AutoScroll = true;
             }
         }
 
-        private void BtnEditar_Click(object? sender, EventArgs e)
+        // Cria uma área alternativa caso o botão Atualizar não exista.
+        private void CriarPainelAlternativoRedefinicao()
         {
-            int? idUsuario = ObterUsuarioSelecionado();
+            FlowLayoutPanel painelAcoes = new()
+            {
+                Name = "pnlRedefinicaoSenha",
+                Dock = DockStyle.Bottom,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                Padding = new Padding(12, 8, 12, 8),
+                BackColor = Color.Transparent
+            };
+
+            btnRedefinirSenha!.Margin = new Padding(4);
+
+            painelAcoes.Controls.Add(btnRedefinirSenha);
+
+            Controls.Add(painelAcoes);
+
+            painelAcoes.BringToFront();
+        }
+
+        // Procura recursivamente o botão Atualizar lista.
+        private static Button? LocalizarBotaoAtualizar(
+            Control container)
+        {
+            foreach (Control controle in container.Controls)
+            {
+                if (controle is Button botao &&
+                    botao.Text.Contains(
+                        "Atualizar lista",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return botao;
+                }
+
+                Button? encontrado =
+                    LocalizarBotaoAtualizar(controle);
+
+                if (encontrado != null)
+                {
+                    return encontrado;
+                }
+            }
+
+            return null;
+        }
+
+        // Verifica a seleção e o status antes de redefinir a senha.
+        private void AbrirRedefinicaoSenha()
+        {
+            int? idUsuario = ObterSelecionado();
 
             if (!idUsuario.HasValue)
+            {
                 return;
+            }
 
-            DataGridViewRow linha = dgvUsuarios.CurrentRow!;
+            DataGridViewRow? linhaSelecionada =
+                dgvUsuarios.CurrentRow;
 
-            string nomeAtual =
-                Convert.ToString(
-                    linha.Cells["NomeCompleto"].Value) ?? "";
+            if (linhaSelecionada == null)
+            {
+                return;
+            }
 
-            string loginAtual =
-                Convert.ToString(
-                    linha.Cells["Login"].Value) ?? "";
+            string nomeUsuario = Convert.ToString(
+                linhaSelecionada.Cells["NomeCompleto"].Value) ?? "";
 
-            int perfilAtual = Convert.ToInt32(
-                linha.Cells["IdPerfil"].Value);
+            string loginUsuario = Convert.ToString(
+                linhaSelecionada.Cells["Login"].Value) ?? "";
 
+            bool usuarioAtivo = Convert.ToBoolean(
+                linhaSelecionada.Cells["Ativo"].Value);
+
+            if (!usuarioAtivo)
+            {
+                ExibirMensagemRedefinicao(
+                    "Não é possível redefinir a senha de uma conta desativada.",
+                    "Usuário inativo",
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            ExibirFormularioRedefinicao(
+                idUsuario.Value,
+                nomeUsuario,
+                loginUsuario);
+        }
+
+        // Monta a janela para definir uma nova senha provisória.
+        private void ExibirFormularioRedefinicao(
+            int idUsuario,
+            string nomeUsuario,
+            string loginUsuario)
+        {
             using Form janela = new()
             {
-                Text = "Editar usuário",
+                Text = "Redefinir senha provisória",
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
-                ClientSize = new Size(480, 350),
+                ClientSize = new Size(470, 355),
+                MinimumSize = new Size(440, 380),
                 MaximizeBox = false,
-                MinimizeBox = false
+                MinimizeBox = false,
+                BackColor = Color.White,
+                Font = new Font("Segoe UI", 10),
+                AutoScaleMode = AutoScaleMode.Dpi
             };
 
-            Label lblNome = new()
+            Label lblUsuario = new()
             {
-                Text = "Nome completo",
-                Location = new Point(25, 25),
-                AutoSize = true
+                Text =
+                    $"Usuário: {nomeUsuario}\nLogin: {loginUsuario}",
+
+                Location = new Point(25, 20),
+                Size = new Size(420, 55),
+
+                Font = new Font(
+                    "Segoe UI",
+                    10,
+                    FontStyle.Bold),
+
+                Anchor =
+                    AnchorStyles.Top |
+                    AnchorStyles.Left |
+                    AnchorStyles.Right
             };
 
-            TextBox txtNome = new()
+            Label lblSenha = CriarRotuloRedefinicao(
+                "Senha provisória",
+                85);
+
+            TextBox txtSenha = CriarCampoSenha(110);
+
+            Label lblConfirmar = CriarRotuloRedefinicao(
+                "Confirmar senha provisória",
+                155);
+
+            TextBox txtConfirmar = CriarCampoSenha(180);
+
+            Label lblRegras = new()
             {
-                Text = nomeAtual,
-                Location = new Point(25, 50),
-                Width = 425,
-                MaxLength = 150
+                Text =
+                    "Mínimo de 8 caracteres, com letra maiúscula, " +
+                    "minúscula, número e símbolo.\n" +
+                    "O usuário deverá trocar essa senha no próximo acesso.",
+
+                Location = new Point(25, 225),
+                Size = new Size(420, 55),
+                ForeColor = Color.DimGray,
+
+                Anchor =
+                    AnchorStyles.Top |
+                    AnchorStyles.Left |
+                    AnchorStyles.Right
             };
 
-            Label lblLogin = new()
+            Button btnCancelar = new()
             {
-                Text = "Login / Identificador",
-                Location = new Point(25, 100),
-                AutoSize = true
-            };
-
-            TextBox txtLogin = new()
-            {
-                Text = loginAtual,
-                Location = new Point(25, 125),
-                Width = 425,
-                MaxLength = 100,
-                ReadOnly = perfilAtual != 1
-            };
-
-            Label lblPerfil = new()
-            {
-                Text = "Perfil de acesso",
-                Location = new Point(25, 175),
-                AutoSize = true
-            };
-
-            ComboBox cmbPerfil = new()
-            {
-                Location = new Point(25, 200),
-                Width = 425,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Enabled = false
-            };
-
-            cmbPerfil.DisplayMember = "NomePerfil";
-            cmbPerfil.ValueMember = "IdPerfil";
-            cmbPerfil.DataSource = _repositorio.ListarPerfis();
-            cmbPerfil.SelectedValue = perfilAtual;
-
-            Label lblAviso = new()
-            {
-                Text = "A alteração de perfil está desativada " +
-                       "para preservar os vínculos acadêmicos.",
-                Location = new Point(25, 240),
-                Size = new Size(425, 35),
-                ForeColor = Color.DimGray
+                Text = "Cancelar",
+                Size = new Size(110, 40),
+                DialogResult = DialogResult.Cancel
             };
 
             Button btnSalvar = new()
             {
-                Text = "Salvar alterações",
-                Location = new Point(275, 290),
-                Size = new Size(175, 38)
+                Text = "Redefinir",
+                Size = new Size(125, 40),
+                BackColor = CorPrincipal,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
 
-            btnSalvar.Click += (s, args) =>
+            btnSalvar.FlatAppearance.BorderSize = 0;
+
+            FlowLayoutPanel painelBotoes = new()
             {
-                try
-                {
-                    _usuarioService.EditarUsuario(
-                        _usuarioLogado,
-                        idUsuario.Value,
-                        txtNome.Text,
-                        txtLogin.Text,
-                        perfilAtual);
-
-                    MessageBox.Show(
-                        "Usuário atualizado com sucesso!",
-                        "Edição concluída",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-
-                    janela.DialogResult = DialogResult.OK;
-                    janela.Close();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(
-                        ex.Message,
-                        "Erro na edição",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                }
+                Dock = DockStyle.Bottom,
+                Height = 60,
+                FlowDirection = FlowDirection.RightToLeft,
+                Padding = new Padding(15, 8, 15, 8),
+                WrapContents = false,
+                BackColor = Color.White
             };
+
+            painelBotoes.Controls.Add(btnSalvar);
+            painelBotoes.Controls.Add(btnCancelar);
+
+            // Encaminha os dados digitados para validação.
+            btnSalvar.Click += (_, _) =>
+                ProcessarRedefinicaoSenha(
+                    janela,
+                    btnSalvar,
+                    txtSenha,
+                    txtConfirmar,
+                    idUsuario,
+                    nomeUsuario,
+                    loginUsuario);
 
             janela.Controls.AddRange(new Control[]
             {
-                lblNome,
-                txtNome,
-                lblLogin,
-                txtLogin,
-                lblPerfil,
-                cmbPerfil,
-                lblAviso,
-                btnSalvar
+                lblUsuario,
+                lblSenha,
+                txtSenha,
+                lblConfirmar,
+                txtConfirmar,
+                lblRegras,
+                painelBotoes
             });
 
-            if (janela.ShowDialog(this) == DialogResult.OK)
-                CarregarUsuarios();
+            janela.AcceptButton = btnSalvar;
+            janela.CancelButton = btnCancelar;
+
+            janela.ShowDialog(this);
         }
 
-        private void BtnStatus_Click(object? sender, EventArgs e)
+        // Padroniza os rótulos utilizados na janela.
+        private static Label CriarRotuloRedefinicao(
+            string texto,
+            int posicaoY)
         {
-            int? idUsuario = ObterUsuarioSelecionado();
+            return new Label
+            {
+                Text = texto,
+                Location = new Point(25, posicaoY),
+                AutoSize = true
+            };
+        }
 
-            if (!idUsuario.HasValue)
+        // Cria campos que ocultam os caracteres da senha.
+        private static TextBox CriarCampoSenha(int posicaoY)
+        {
+            return new TextBox
+            {
+                Location = new Point(25, posicaoY),
+                Width = 420,
+                UseSystemPasswordChar = true,
+                MaxLength = 128,
+
+                Anchor =
+                    AnchorStyles.Top |
+                    AnchorStyles.Left |
+                    AnchorStyles.Right
+            };
+        }
+
+        // Valida os campos e solicita confirmação da operação.
+        private void ProcessarRedefinicaoSenha(
+            Form janela,
+            Button btnSalvar,
+            TextBox txtSenha,
+            TextBox txtConfirmar,
+            int idUsuario,
+            string nomeUsuario,
+            string loginUsuario)
+        {
+            if (string.IsNullOrWhiteSpace(txtSenha.Text))
+            {
+                ExibirMensagemRedefinicao(
+                    "Informe a senha provisória.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
+
+                txtSenha.Focus();
                 return;
+            }
 
-            DataGridViewRow linha = dgvUsuarios.CurrentRow!;
+            if (txtSenha.Text != txtConfirmar.Text)
+            {
+                ExibirMensagemRedefinicao(
+                    "As senhas não coincidem.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
 
-            string nome =
-                Convert.ToString(
-                    linha.Cells["NomeCompleto"].Value) ?? "";
-
-            bool ativo = Convert.ToBoolean(
-                linha.Cells["Ativo"].Value);
-
-            bool novoStatus = !ativo;
-
-            string acao =
-                novoStatus ? "ativar" : "desativar";
-
-            DialogResult resposta = MessageBox.Show(
-                $"Deseja realmente {acao} o usuário '{nome}'?",
-                "Confirmar alteração",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
-
-            if (resposta != DialogResult.Yes)
+                txtConfirmar.Focus();
                 return;
+            }
 
             try
             {
-                _usuarioService.AlterarStatusUsuario(
-                    _usuarioLogado,
-                    idUsuario.Value,
-                    novoStatus);
+                // Reutiliza a regra de complexidade da camada de serviços.
+                UsuarioService.ValidarSenha(txtSenha.Text);
 
-                MessageBox.Show(
-                    "Status atualizado com sucesso!",
-                    "Operação concluída",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                DialogResult confirmacao = MessageBox.Show(
+                    $"Deseja redefinir a senha de '{nomeUsuario}'?\n\n" +
+                    "A senha atual deixará de funcionar e o usuário " +
+                    "deverá cadastrar uma nova senha no próximo login.",
+                    "Confirmar redefinição",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
 
-                CarregarUsuarios();
+                if (confirmacao != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                ExecutarRedefinicaoSenha(
+                    janela,
+                    btnSalvar,
+                    idUsuario,
+                    nomeUsuario,
+                    loginUsuario,
+                    txtSenha.Text);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
+                ExibirMensagemRedefinicao(
                     ex.Message,
-                    "Erro na alteração de status",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    "Não foi possível redefinir a senha",
+                    MessageBoxIcon.Warning);
             }
+        }
+
+        // Executa a operação pela camada de serviços.
+        private void ExecutarRedefinicaoSenha(
+            Form janela,
+            Button btnSalvar,
+            int idUsuario,
+            string nomeUsuario,
+            string loginUsuario,
+            string senhaProvisoria)
+        {
+            try
+            {
+                btnSalvar.Enabled = false;
+
+                RedefinicaoSenhaService servico = new();
+
+                servico.RedefinirSenha(
+                    _usuarioLogado,
+                    idUsuario,
+                    senhaProvisoria);
+
+                ExibirMensagemRedefinicao(
+                    "Senha provisória definida com sucesso!\n\n" +
+                    $"Usuário: {nomeUsuario}\n" +
+                    $"Login: {loginUsuario}\n\n" +
+                    "No próximo acesso, o sistema exigirá " +
+                    "a criação de uma nova senha.\n\n" +
+                    "Informe a senha provisória ao usuário " +
+                    "por um meio seguro.",
+                    "Redefinição concluída",
+                    MessageBoxIcon.Information);
+
+                janela.DialogResult = DialogResult.OK;
+                janela.Close();
+            }
+            finally
+            {
+                // Libera o botão mesmo quando ocorre uma exceção.
+                btnSalvar.Enabled = true;
+            }
+        }
+
+        // Centraliza as mensagens da funcionalidade de redefinição.
+        private static void ExibirMensagemRedefinicao(
+            string mensagem,
+            string titulo,
+            MessageBoxIcon icone)
+        {
+            MessageBox.Show(
+                mensagem,
+                titulo,
+                MessageBoxButtons.OK,
+                icone);
         }
     }
 }

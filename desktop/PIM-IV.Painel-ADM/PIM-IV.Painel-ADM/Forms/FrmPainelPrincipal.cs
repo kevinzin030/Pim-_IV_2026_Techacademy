@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using PIM_IV.Painel_ADM.Forms;
@@ -10,6 +9,13 @@ namespace PIM_IV.Painel_ADM
 {
     public partial class FrmPainelPrincipal : Form
     {
+        private const int PerfilAdministrador = 1;
+        private const int PerfilCoordenador = 2;
+
+        private const int LarguraMenu = 245;
+        private const int AlturaCabecalho = 75;
+        private const int EspacamentoMenu = 55;
+
         private readonly Usuario _usuario;
         private readonly PermissaoService _permissaoService = new();
 
@@ -26,38 +32,43 @@ namespace PIM_IV.Painel_ADM
         private Panel pnlConteudo = null!;
         private Label lblTituloPagina = null!;
 
+        // Recebe o usuário autenticado e prepara o painel.
         public FrmPainelPrincipal(Usuario usuario)
         {
             InitializeComponent();
 
-            _usuario = usuario ??
-                throw new ArgumentNullException(nameof(usuario));
+            _usuario = usuario
+                ?? throw new ArgumentNullException(nameof(usuario));
 
-            Text = _usuario.IdPerfil == 2
+            ConfigurarFormulario();
+            CriarLayout();
+
+            FormClosing += FrmPainelPrincipal_FormClosing;
+        }
+
+        // Define a aparência e o título conforme o perfil.
+        private void ConfigurarFormulario()
+        {
+            Text = _usuario.IdPerfil == PerfilCoordenador
                 ? "TechAcademy - Painel do Coordenador"
                 : "TechAcademy - Painel Administrativo";
 
             StartPosition = FormStartPosition.CenterScreen;
             WindowState = FormWindowState.Maximized;
             MinimumSize = new Size(900, 600);
+
             AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = _fundo;
-
-            CriarLayout();
-
-            FormClosing += FrmPainelPrincipal_FormClosing;
         }
 
-        // =====================================================
-        // PERMISSÕES E SEGURANÇA
-        // =====================================================
-
+        // Consulta as permissões do usuário sem liberar acesso em caso de erro.
         private bool TemPermissao(string codigo)
         {
             try
             {
                 return _permissaoService.UsuarioTemPermissao(
-                    _usuario, codigo);
+                    _usuario,
+                    codigo);
             }
             catch (Exception)
             {
@@ -65,48 +76,48 @@ namespace PIM_IV.Painel_ADM
             }
         }
 
+        // Verifica a autorização antes de abrir um módulo.
         private bool Autorizar(string codigo)
         {
             try
             {
                 if (_permissaoService.UsuarioTemPermissao(
-                    _usuario, codigo))
+                    _usuario,
+                    codigo))
                 {
                     return true;
                 }
 
-                MessageBox.Show(
+                ExibirMensagemPainel(
                     "Você não possui permissão para acessar este módulo.",
                     "Acesso negado",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
 
                 AtualizarPainel();
+
                 return false;
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
+                ExibirMensagemPainel(
                     "Não foi possível verificar sua permissão:\n" +
                     ex.Message,
                     "Erro de autorização",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
 
                 return false;
             }
         }
 
-        // =====================================================
-        // ENCERRAMENTO
-        // =====================================================
-
+        // Solicita confirmação antes de encerrar o painel.
         private void FrmPainelPrincipal_FormClosing(
             object? sender,
             FormClosingEventArgs e)
         {
             if (e.CloseReason != CloseReason.UserClosing)
+            {
                 return;
+            }
 
             DialogResult resposta = MessageBox.Show(
                 "Tem certeza de que deseja sair do sistema?",
@@ -116,44 +127,29 @@ namespace PIM_IV.Painel_ADM
                 MessageBoxDefaultButton.Button2);
 
             if (resposta != DialogResult.Yes)
+            {
                 e.Cancel = true;
+            }
         }
 
-        // =====================================================
-        // LAYOUT PRINCIPAL
-        // =====================================================
-
+        // Cria as três áreas principais da interface.
         private void CriarLayout()
         {
             Controls.Clear();
 
-            pnlMenu = new Panel
-            {
-                Dock = DockStyle.Left,
-                Width = 245,
-                BackColor = _azulEscuro
-            };
+            pnlMenu = CriarPainelMenu();
+            pnlConteudo = CriarPainelConteudo();
 
-            Panel pnlCabecalho = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 75,
-                BackColor = Color.White
-            };
-
-            pnlConteudo = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = _fundo,
-                AutoScroll = true
-            };
+            Panel pnlCabecalho = CriarPainelCabecalho();
 
             lblTituloPagina = new Label
             {
-                Text = "",
+                Text = string.Empty,
                 AutoSize = true,
                 Font = new Font(
-                    "Segoe UI", 23, FontStyle.Bold),
+                    "Segoe UI",
+                    23,
+                    FontStyle.Bold),
                 ForeColor = _azulEscuro
             };
 
@@ -166,47 +162,56 @@ namespace PIM_IV.Painel_ADM
             MostrarInicio();
         }
 
+        // Cria a área lateral de navegação.
+        private Panel CriarPainelMenu()
+        {
+            return new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = LarguraMenu,
+                BackColor = _azulEscuro
+            };
+        }
+
+        // Cria a área central onde os módulos serão apresentados.
+        private Panel CriarPainelConteudo()
+        {
+            return new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = _fundo,
+                AutoScroll = true
+            };
+        }
+
+        // Cria o cabeçalho superior do sistema.
+        private static Panel CriarPainelCabecalho()
+        {
+            return new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = AlturaCabecalho,
+                BackColor = Color.White
+            };
+        }
+
+        // Reconstrói o menu e retorna à página inicial.
         private void AtualizarPainel()
         {
             pnlMenu.Controls.Clear();
+
             CriarMenu();
             MostrarInicio();
         }
 
-        // =====================================================
-        // MENU LATERAL
-        // =====================================================
-
+        // Monta o menu lateral de acordo com as permissões.
         private void CriarMenu()
         {
             pnlMenu.Controls.Clear();
 
-            Panel rodape = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 60,
-                BackColor = Color.FromArgb(33, 51, 80)
-            };
+            Panel rodape = CriarRodapeMenu();
 
-            Button btnSair = new Button
-            {
-                Text = "↪  Sair",
-                Dock = DockStyle.Fill,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = rodape.BackColor,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 11),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(22, 0, 0, 0),
-                Cursor = Cursors.Hand
-            };
-
-            btnSair.FlatAppearance.BorderSize = 0;
-            btnSair.Click += (_, _) => Close();
-
-            rodape.Controls.Add(btnSair);
-
-            Panel areaRolavel = new Panel
+            Panel areaRolavel = new()
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
@@ -216,29 +221,7 @@ namespace PIM_IV.Painel_ADM
             pnlMenu.Controls.Add(areaRolavel);
             pnlMenu.Controls.Add(rodape);
 
-            Label lblSistema = new Label
-            {
-                Text = "TechAcademy",
-                ForeColor = Color.White,
-                Font = new Font(
-                    "Segoe UI", 17, FontStyle.Bold),
-                Location = new Point(20, 25),
-                AutoSize = true
-            };
-
-            Label lblSubtitulo = new Label
-            {
-                Text = _usuario.IdPerfil == 2
-                    ? "PAINEL DO COORDENADOR"
-                    : "PAINEL ADMINISTRATIVO",
-                ForeColor = Color.LightGray,
-                Font = new Font("Segoe UI", 9),
-                Location = new Point(22, 65),
-                AutoSize = true
-            };
-
-            areaRolavel.Controls.Add(lblSistema);
-            areaRolavel.Controls.Add(lblSubtitulo);
+            AdicionarIdentificacaoMenu(areaRolavel);
 
             int posicaoY = 130;
 
@@ -248,57 +231,39 @@ namespace PIM_IV.Painel_ADM
                 posicaoY,
                 MostrarInicio);
 
-            posicaoY += 55;
+            posicaoY += EspacamentoMenu;
 
-            if (TemPermissao("GERENCIAR_USUARIOS"))
+            AdicionarOpcaoMenuPermitida(
+                areaRolavel,
+                "♙  Usuários",
+                "GERENCIAR_USUARIOS",
+                AbrirGerenciamentoUsuarios,
+                ref posicaoY);
+
+            AdicionarOpcaoMenuPermitida(
+                areaRolavel,
+                "⚿  Acessos",
+                "GERENCIAR_ACESSOS",
+                AbrirControleAcessos,
+                ref posicaoY);
+
+            AdicionarOpcaoMenuPermitida(
+                areaRolavel,
+                "◷  Atividades",
+                "CONSULTAR_AUDITORIA",
+                AbrirAtividades,
+                ref posicaoY);
+
+            if (_usuario.IdPerfil == PerfilCoordenador)
             {
-                AdicionarBotaoMenu(
-                    areaRolavel,
-                    "♙  Usuários",
-                    posicaoY,
-                    AbrirGerenciamentoUsuarios);
-
-                posicaoY += 55;
-            }
-
-            if (TemPermissao("GERENCIAR_ACESSOS"))
-            {
-                AdicionarBotaoMenu(
-                    areaRolavel,
-                    "⚿  Acessos",
-                    posicaoY,
-                    AbrirControleAcessos);
-
-                posicaoY += 55;
-            }
-
-            if (TemPermissao("CONSULTAR_AUDITORIA"))
-            {
-                AdicionarBotaoMenu(
-                    areaRolavel,
-                    "◷  Atividades",
-                    posicaoY,
-                    AbrirAtividades);
-
-                posicaoY += 55;
-            }
-
-            if (_usuario.IdPerfil == 2 &&
-                TemPermissao("GERENCIAR_TURMAS"))
-            {
-                AdicionarBotaoMenu(
+                AdicionarOpcaoMenuPermitida(
                     areaRolavel,
                     "›  Turmas",
-                    posicaoY,
-                    AbrirGerenciamentoTurmas);
+                    "GERENCIAR_TURMAS",
+                    AbrirGerenciamentoTurmas,
+                    ref posicaoY);
 
-                posicaoY += 55;
-            }
-
-            // Um único acesso ao gerenciamento e à
-            // vinculação de disciplinas.
-            if (_usuario.IdPerfil == 2)
-            {
+                // Mantém o acesso unificado às disciplinas.
                 AdicionarModuloMenu(
                     areaRolavel,
                     "Disciplinas",
@@ -319,6 +284,92 @@ namespace PIM_IV.Painel_ADM
                 ref posicaoY);
         }
 
+        // Cria o rodapé com a opção de sair do sistema.
+        private Panel CriarRodapeMenu()
+        {
+            Panel rodape = new()
+            {
+                Dock = DockStyle.Bottom,
+                Height = 60,
+                BackColor = Color.FromArgb(33, 51, 80)
+            };
+
+            Button btnSair = new()
+            {
+                Text = "↪  Sair",
+                Dock = DockStyle.Fill,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = rodape.BackColor,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 11),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(22, 0, 0, 0),
+                Cursor = Cursors.Hand
+            };
+
+            btnSair.FlatAppearance.BorderSize = 0;
+
+            btnSair.Click += (_, _) => Close();
+
+            rodape.Controls.Add(btnSair);
+
+            return rodape;
+        }
+
+        // Exibe o nome do sistema e o tipo de painel.
+        private void AdicionarIdentificacaoMenu(Panel areaMenu)
+        {
+            Label lblSistema = new()
+            {
+                Text = "TechAcademy",
+                ForeColor = Color.White,
+                Font = new Font(
+                    "Segoe UI",
+                    17,
+                    FontStyle.Bold),
+                Location = new Point(20, 25),
+                AutoSize = true
+            };
+
+            Label lblSubtitulo = new()
+            {
+                Text = _usuario.IdPerfil == PerfilCoordenador
+                    ? "PAINEL DO COORDENADOR"
+                    : "PAINEL ADMINISTRATIVO",
+
+                ForeColor = Color.LightGray,
+                Font = new Font("Segoe UI", 9),
+                Location = new Point(22, 65),
+                AutoSize = true
+            };
+
+            areaMenu.Controls.Add(lblSistema);
+            areaMenu.Controls.Add(lblSubtitulo);
+        }
+
+        // Adiciona uma opção somente quando o usuário possui permissão.
+        private void AdicionarOpcaoMenuPermitida(
+            Panel areaMenu,
+            string texto,
+            string permissao,
+            Action acao,
+            ref int posicaoY)
+        {
+            if (!TemPermissao(permissao))
+            {
+                return;
+            }
+
+            AdicionarBotaoMenu(
+                areaMenu,
+                texto,
+                posicaoY,
+                acao);
+
+            posicaoY += EspacamentoMenu;
+        }
+
+        // Adiciona um módulo acadêmico ao menu.
         private void AdicionarModuloMenu(
             Panel areaMenu,
             string nomeModulo,
@@ -326,32 +377,39 @@ namespace PIM_IV.Painel_ADM
             ref int posicaoY)
         {
             if (!TemPermissao(permissao))
+            {
                 return;
+            }
 
             AdicionarBotaoMenu(
                 areaMenu,
                 "›  " + nomeModulo,
                 posicaoY,
                 () => AbrirModuloAcademico(
-                    nomeModulo, permissao));
+                    nomeModulo,
+                    permissao));
 
-            posicaoY += 55;
+            posicaoY += EspacamentoMenu;
         }
 
+        // Cria botões de navegação com aparência padronizada.
         private void AdicionarBotaoMenu(
             Panel areaMenu,
             string texto,
             int posicaoY,
             Action acao)
         {
-            Button botao = new Button
+            Button botao = new()
             {
                 Text = texto,
                 Location = new Point(10, posicaoY),
                 Size = new Size(225, 45),
-                Anchor = AnchorStyles.Top |
-                         AnchorStyles.Left |
-                         AnchorStyles.Right,
+
+                Anchor =
+                    AnchorStyles.Top |
+                    AnchorStyles.Left |
+                    AnchorStyles.Right,
+
                 FlatStyle = FlatStyle.Flat,
                 BackColor = _azulEscuro,
                 ForeColor = Color.White,
@@ -374,17 +432,18 @@ namespace PIM_IV.Painel_ADM
             areaMenu.Controls.Add(botao);
         }
 
-        // =====================================================
-        // CABEÇALHO
-        // =====================================================
-
+        // Exibe o nome e o perfil do usuário autenticado.
         private void CriarCabecalho(Panel cabecalho)
         {
-            Label lblSistema = new Label
+            Label lblSistema = new()
             {
                 Text = "TechAcademy | Plataforma Acadêmica",
+
                 Font = new Font(
-                    "Segoe UI", 15, FontStyle.Bold),
+                    "Segoe UI",
+                    15,
+                    FontStyle.Bold),
+
                 ForeColor = _azulEscuro,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -392,18 +451,11 @@ namespace PIM_IV.Painel_ADM
                 AutoEllipsis = true
             };
 
-            string perfil = _usuario.IdPerfil switch
+            Label lblUsuario = new()
             {
-                1 => "Administrador",
-                2 => "Coordenador",
-                3 => "Professor",
-                4 => "Aluno",
-                _ => "Usuário"
-            };
+                Text =
+                    $"{_usuario.NomeCompleto} | {ObterNomePerfil()}",
 
-            Label lblUsuario = new Label
-            {
-                Text = $"{_usuario.NomeCompleto} | {perfil}",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.DimGray,
                 Dock = DockStyle.Right,
@@ -416,16 +468,43 @@ namespace PIM_IV.Painel_ADM
             cabecalho.Controls.Add(lblUsuario);
         }
 
-        // =====================================================
-        // PÁGINA INICIAL
-        // =====================================================
+        // Converte o identificador do perfil em um nome legível.
+        private string ObterNomePerfil()
+        {
+            return _usuario.IdPerfil switch
+            {
+                1 => "Administrador",
+                2 => "Coordenador",
+                3 => "Professor",
+                4 => "Aluno",
+                _ => "Usuário"
+            };
+        }
 
+        // Apresenta a página inicial do painel.
         private void MostrarInicio()
         {
             pnlConteudo.Controls.Clear();
 
             lblTituloPagina.Text = "Início";
 
+            TableLayoutPanel estrutura = CriarEstruturaInicio();
+
+            Panel apresentacao = CriarApresentacaoInicio();
+
+            FlowLayoutPanel cartoes = CriarAreaCartoes();
+
+            estrutura.Controls.Add(apresentacao, 0, 0);
+            estrutura.Controls.Add(cartoes, 0, 1);
+
+            pnlConteudo.Controls.Add(estrutura);
+
+            AdicionarCartoesInicio(cartoes);
+        }
+
+        // Organiza a apresentação e os cartões em duas linhas.
+        private TableLayoutPanel CriarEstruturaInicio()
+        {
             TableLayoutPanel estrutura = new()
             {
                 Dock = DockStyle.Fill,
@@ -444,23 +523,33 @@ namespace PIM_IV.Painel_ADM
             estrutura.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
-            Panel apresentacao = new Panel
+            return estrutura;
+        }
+
+        // Exibe a saudação e a orientação inicial.
+        private Panel CriarApresentacaoInicio()
+        {
+            Panel apresentacao = new()
             {
                 Dock = DockStyle.Fill
             };
 
-            Label lblBoasVindas = new Label
+            Label lblBoasVindas = new()
             {
                 Text = $"Bem-vindo(a), {_usuario.NomeCompleto}!",
+
                 Font = new Font(
-                    "Segoe UI", 23, FontStyle.Bold),
+                    "Segoe UI",
+                    23,
+                    FontStyle.Bold),
+
                 ForeColor = _azulEscuro,
                 Dock = DockStyle.Top,
                 Height = 65,
                 AutoEllipsis = true
             };
 
-            Label lblDescricao = new Label
+            Label lblDescricao = new()
             {
                 Text = "Selecione uma funcionalidade para começar.",
                 Font = new Font("Segoe UI", 11),
@@ -472,7 +561,13 @@ namespace PIM_IV.Painel_ADM
             apresentacao.Controls.Add(lblDescricao);
             apresentacao.Controls.Add(lblBoasVindas);
 
-            FlowLayoutPanel cartoes = new()
+            return apresentacao;
+        }
+
+        // Cria a área rolável que receberá os cartões.
+        private static FlowLayoutPanel CriarAreaCartoes()
+        {
+            return new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
@@ -480,12 +575,12 @@ namespace PIM_IV.Painel_ADM
                 WrapContents = true,
                 Padding = Padding.Empty
             };
+        }
 
-            estrutura.Controls.Add(apresentacao, 0, 0);
-            estrutura.Controls.Add(cartoes, 0, 1);
-
-            pnlConteudo.Controls.Add(estrutura);
-
+        // Adiciona os cartões conforme o perfil e as permissões.
+        private void AdicionarCartoesInicio(
+            FlowLayoutPanel cartoes)
+        {
             int indice = 0;
 
             AdicionarCartaoPermitido(
@@ -512,7 +607,7 @@ namespace PIM_IV.Painel_ADM
                 AbrirAtividades,
                 ref indice);
 
-            if (_usuario.IdPerfil == 2)
+            if (_usuario.IdPerfil == PerfilCoordenador)
             {
                 AdicionarCartaoPermitido(
                     cartoes,
@@ -522,7 +617,6 @@ namespace PIM_IV.Painel_ADM
                     AbrirGerenciamentoTurmas,
                     ref indice);
 
-                // Cartão unificado: cadastro e vinculação.
                 AdicionarCartaoModulo(
                     cartoes,
                     "Disciplinas",
@@ -546,6 +640,7 @@ namespace PIM_IV.Painel_ADM
                 ref indice);
         }
 
+        // Adiciona um cartão de módulo acadêmico.
         private void AdicionarCartaoModulo(
             FlowLayoutPanel areaCartoes,
             string titulo,
@@ -559,10 +654,12 @@ namespace PIM_IV.Painel_ADM
                 descricao,
                 permissao,
                 () => AbrirModuloAcademico(
-                    titulo, permissao),
+                    titulo,
+                    permissao),
                 ref indice);
         }
 
+        // Exibe o cartão somente quando a permissão está disponível.
         private void AdicionarCartaoPermitido(
             FlowLayoutPanel areaCartoes,
             string titulo,
@@ -572,7 +669,9 @@ namespace PIM_IV.Painel_ADM
             ref int indice)
         {
             if (!TemPermissao(permissao))
+            {
                 return;
+            }
 
             CriarCartao(
                 areaCartoes,
@@ -583,13 +682,14 @@ namespace PIM_IV.Painel_ADM
             indice++;
         }
 
+        // Cria um cartão clicável para acessar um módulo.
         private void CriarCartao(
             FlowLayoutPanel areaCartoes,
             string titulo,
             string descricao,
             Action acao)
         {
-            Panel cartao = new Panel
+            Panel cartao = new()
             {
                 Size = new Size(265, 165),
                 BackColor = Color.White,
@@ -597,18 +697,22 @@ namespace PIM_IV.Painel_ADM
                 Margin = new Padding(5, 5, 20, 20)
             };
 
-            Label lblTitulo = new Label
+            Label lblTitulo = new()
             {
                 Text = titulo,
+
                 Font = new Font(
-                    "Segoe UI", 16, FontStyle.Bold),
+                    "Segoe UI",
+                    16,
+                    FontStyle.Bold),
+
                 ForeColor = _azulEscuro,
                 Location = new Point(20, 30),
                 Size = new Size(225, 40),
                 AutoEllipsis = true
             };
 
-            Label lblDescricao = new Label
+            Label lblDescricao = new()
             {
                 Text = descricao,
                 Font = new Font("Segoe UI", 10),
@@ -628,153 +732,143 @@ namespace PIM_IV.Painel_ADM
             areaCartoes.Controls.Add(cartao);
         }
 
-        // =====================================================
-        // GERENCIAMENTO DE USUÁRIOS
-        // =====================================================
-
+        // Abre o gerenciamento de usuários após verificar a permissão.
         private void AbrirGerenciamentoUsuarios()
         {
             if (!Autorizar("GERENCIAR_USUARIOS"))
+            {
                 return;
+            }
 
             try
             {
                 FrmGerenciarUsuarios formulario =
-                    new FrmGerenciarUsuarios(_usuario);
+                    new(_usuario);
 
                 ExibirFormularioCentral(formulario);
+
                 lblTituloPagina.Text = "Usuários";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Não foi possível abrir o gerenciamento de usuários.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ExibirErroAberturaModulo(
+                    "gerenciamento de usuários",
+                    ex);
             }
         }
 
-        // =====================================================
-        // CONTROLE DE ACESSOS
-        // =====================================================
-
+        // Abre o gerenciamento de perfis e permissões.
         private void AbrirControleAcessos()
         {
             if (!Autorizar("GERENCIAR_ACESSOS"))
+            {
                 return;
+            }
 
             try
             {
                 FrmControleAcessos formulario =
-                    new FrmControleAcessos(_usuario);
+                    new(_usuario);
 
                 ExibirFormularioCentral(formulario);
+
                 lblTituloPagina.Text = "Acessos";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Não foi possível abrir o controle de acessos.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ExibirErroAberturaModulo(
+                    "controle de acessos",
+                    ex);
             }
         }
 
-        // =====================================================
-        // REGISTROS DE ATIVIDADES
-        // =====================================================
-
+        // Abre a consulta dos registros de atividades.
         private void AbrirAtividades()
         {
             if (!Autorizar("CONSULTAR_AUDITORIA"))
+            {
                 return;
+            }
 
             try
             {
                 FrmLogsAtividades formulario =
-                    new FrmLogsAtividades(_usuario);
+                    new(_usuario);
 
                 ExibirFormularioCentral(formulario);
+
                 lblTituloPagina.Text = "Atividades";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Não foi possível abrir os registros de atividades.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ExibirErroAberturaModulo(
+                    "registros de atividades",
+                    ex);
             }
         }
 
-        // =====================================================
-        // GERENCIAMENTO DE TURMAS
-        // =====================================================
-
+        // Abre o gerenciamento de turmas exclusivamente ao Coordenador.
         private void AbrirGerenciamentoTurmas()
         {
-            if (_usuario.IdPerfil != 2)
+            if (_usuario.IdPerfil != PerfilCoordenador)
             {
-                MessageBox.Show(
+                ExibirMensagemPainel(
                     "O gerenciamento de turmas é exclusivo do Coordenador.",
                     "Acesso negado",
-                    MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
 
                 return;
             }
 
             if (!Autorizar("GERENCIAR_TURMAS"))
+            {
                 return;
+            }
 
             try
             {
                 FrmGerenciarTurmas formulario =
-                    new FrmGerenciarTurmas(_usuario);
+                    new(_usuario);
 
                 ExibirFormularioCentral(formulario);
+
                 lblTituloPagina.Text = "Turmas";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Não foi possível abrir o gerenciamento de turmas.\n" +
-                    ex.Message,
-                    "Erro ao abrir módulo",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ExibirErroAberturaModulo(
+                    "gerenciamento de turmas",
+                    ex);
             }
         }
 
-        // =====================================================
-        // MÓDULOS SEM INTERFACE PRÓPRIA
-        // =====================================================
-
+        // Exibe uma área informativa para módulos sem interface própria.
         private void MostrarModulo(
             string nomeModulo,
             string permissao)
         {
             if (!Autorizar(permissao))
+            {
                 return;
+            }
 
             pnlConteudo.Controls.Clear();
 
             lblTituloPagina = new Label
             {
                 Text = nomeModulo,
+
                 Font = new Font(
-                    "Segoe UI", 23, FontStyle.Bold),
+                    "Segoe UI",
+                    23,
+                    FontStyle.Bold),
+
                 ForeColor = _azulEscuro,
                 Location = new Point(35, 35),
                 AutoSize = true
             };
 
-            Label lblDescricao = new Label
+            Label lblDescricao = new()
             {
                 Text = "Área de gerenciamento do módulo selecionado.",
                 Font = new Font("Segoe UI", 11),
@@ -785,6 +879,31 @@ namespace PIM_IV.Painel_ADM
 
             pnlConteudo.Controls.Add(lblTituloPagina);
             pnlConteudo.Controls.Add(lblDescricao);
+        }
+
+        // Padroniza os erros apresentados ao abrir módulos.
+        private static void ExibirErroAberturaModulo(
+            string nomeModulo,
+            Exception erro)
+        {
+            ExibirMensagemPainel(
+                $"Não foi possível abrir o {nomeModulo}.\n" +
+                erro.Message,
+                "Erro ao abrir módulo",
+                MessageBoxIcon.Error);
+        }
+
+        // Centraliza as mensagens utilizadas pelo painel.
+        private static void ExibirMensagemPainel(
+            string mensagem,
+            string titulo,
+            MessageBoxIcon icone)
+        {
+            MessageBox.Show(
+                mensagem,
+                titulo,
+                MessageBoxButtons.OK,
+                icone);
         }
     }
 }

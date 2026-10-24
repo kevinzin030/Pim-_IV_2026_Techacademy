@@ -5,180 +5,216 @@ using System.Windows.Forms;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
-    /// <summary>
-    /// Formulário de navegação do módulo de disciplinas.
-    ///
-    /// Organiza as funcionalidades em duas abas:
-    /// - Gerenciar disciplinas;
-    /// - Vincular disciplinas às turmas.
-    ///
-    /// As regras de negócio permanecem nos formulários
-    /// independentes, evitando duplicação de código.
-    /// </summary>
+    // Organiza a navegação entre gerenciamento e vinculação de disciplinas.
     public class FrmDisciplinas : Form
     {
-        // Usuário autenticado, repassado aos formulários internos
-        // para que mantenham suas verificações de permissão.
+        private const string TituloFormulario = "TechAcademy - Disciplinas";
+
         private readonly Usuario _usuario;
 
-        // Cores utilizadas para diferenciar a aba selecionada.
-        private readonly Color _azul = Color.FromArgb(40, 92, 170);
-        private readonly Color _azulClaro = Color.FromArgb(225, 233, 244);
-        private readonly Color _textoEscuro = Color.FromArgb(24, 39, 65);
-        private readonly Color _fundo = Color.FromArgb(244, 247, 251);
+        private readonly Color _corAzul = Color.FromArgb(40, 92, 170);
+        private readonly Color _corAzulClaro = Color.FromArgb(225, 233, 244);
+        private readonly Color _corTexto = Color.FromArgb(24, 39, 65);
+        private readonly Color _corFundo = Color.FromArgb(244, 247, 251);
 
-        // Controle principal que organiza a navegação por abas.
         private readonly TabControl _abas = new();
-
-        // Cada aba recebe um formulário já existente no projeto.
         private readonly TabPage _abaGerenciar = new();
         private readonly TabPage _abaVincular = new();
 
-        // Referências para impedir a criação repetida das telas.
         private FrmGerenciarDisciplinas? _gerenciamento;
         private FrmVincularDisciplinas? _vinculacao;
 
-        // =====================================================
-        // CONSTRUTOR
-        // =====================================================
-
+        // Inicializa o módulo com o usuário autenticado.
         public FrmDisciplinas(Usuario usuario)
         {
-            // Impede abrir o módulo sem um usuário autenticado.
-            _usuario = usuario ??
-                throw new ArgumentNullException(nameof(usuario));
+            _usuario = usuario
+                ?? throw new ArgumentNullException(nameof(usuario));
 
-            Text = "TechAcademy - Disciplinas";
-            Size = new Size(1150, 800);
-            MinimumSize = new Size(650, 450);
-            StartPosition = FormStartPosition.CenterParent;
-
-            AutoScaleMode = AutoScaleMode.Dpi;
-            BackColor = _fundo;
-            Font = new Font("Segoe UI", 10);
-
+            ConfigurarFormulario();
             ConfigurarAbas();
-
-            // Carrega a primeira tela quando o formulário aparece.
-            Shown += (_, _) => CarregarGerenciamento();
+            ConfigurarEventos();
         }
 
-        // =====================================================
-        // CONFIGURAÇÃO DAS ABAS
-        // =====================================================
+        // Define as propriedades visuais do formulário.
+        private void ConfigurarFormulario()
+        {
+            Text = TituloFormulario;
 
+            Size = new Size(1150, 800);
+            MinimumSize = new Size(650, 450);
+
+            StartPosition = FormStartPosition.CenterParent;
+            AutoScaleMode = AutoScaleMode.Dpi;
+
+            BackColor = _corFundo;
+            Font = new Font("Segoe UI", 10);
+        }
+
+        // Organiza as abas de gerenciamento e vinculação.
         private void ConfigurarAbas()
         {
             _abas.Dock = DockStyle.Fill;
-
-            // Desenho personalizado permite destacar a aba ativa.
             _abas.DrawMode = TabDrawMode.OwnerDrawFixed;
             _abas.SizeMode = TabSizeMode.Fixed;
             _abas.ItemSize = new Size(240, 46);
+
             _abas.Font = new Font(
-                "Segoe UI", 12, FontStyle.Bold);
+                "Segoe UI",
+                12,
+                FontStyle.Bold);
 
-            _abaGerenciar.Text = "Gerenciar disciplinas";
-            _abaGerenciar.BackColor = _fundo;
+            ConfigurarPagina(
+                _abaGerenciar,
+                "Gerenciar disciplinas");
 
-            _abaVincular.Text = "Vincular às turmas";
-            _abaVincular.BackColor = _fundo;
+            ConfigurarPagina(
+                _abaVincular,
+                "Vincular às turmas");
 
-            _abas.TabPages.Add(_abaGerenciar);
-            _abas.TabPages.Add(_abaVincular);
-
-            _abas.DrawItem += DesenharAba;
-
-            // Cada formulário é carregado somente quando
-            // sua respectiva aba é selecionada.
-            _abas.SelectedIndexChanged += (_, _) =>
+            _abas.TabPages.AddRange(new[]
             {
-                if (_abas.SelectedTab == _abaGerenciar)
-                {
-                    CarregarGerenciamento();
-                }
-                else if (_abas.SelectedTab == _abaVincular)
-                {
-                    CarregarVinculacao();
-                }
-            };
+                _abaGerenciar,
+                _abaVincular
+            });
 
             Controls.Add(_abas);
         }
 
-        // =====================================================
-        // APARÊNCIA DAS ABAS
-        // =====================================================
+        // Padroniza a aparência das páginas.
+        private void ConfigurarPagina(
+            TabPage pagina,
+            string titulo)
+        {
+            pagina.Text = titulo;
+            pagina.BackColor = _corFundo;
+        }
 
+        // Associa os eventos aos métodos responsáveis.
+        private void ConfigurarEventos()
+        {
+            _abas.DrawItem += DesenharAba;
+
+            _abas.SelectedIndexChanged += AoSelecionarAba;
+
+            Shown += (_, _) => CarregarGerenciamento();
+        }
+
+        // Identifica qual funcionalidade deve ser exibida.
+        private void AoSelecionarAba(
+            object? sender,
+            EventArgs e)
+        {
+            if (_abas.SelectedTab == _abaGerenciar)
+            {
+                CarregarGerenciamento();
+                return;
+            }
+
+            if (_abas.SelectedTab == _abaVincular)
+            {
+                CarregarVinculacao();
+            }
+        }
+
+        // Desenha as abas com a identidade visual do sistema.
         private void DesenharAba(
             object? sender,
             DrawItemEventArgs e)
         {
-            // Garante que a aba solicitada existe.
-            if (e.Index < 0 || e.Index >= _abas.TabPages.Count)
+            if (e.Index < 0 ||
+                e.Index >= _abas.TabPages.Count)
+            {
                 return;
+            }
 
-            bool selecionada = e.Index == _abas.SelectedIndex;
+            bool selecionada =
+                e.Index == _abas.SelectedIndex;
 
             Rectangle area = _abas.GetTabRect(e.Index);
 
-            // Aba ativa: azul com letras brancas.
-            // Aba inativa: azul-claro com letras escuras.
-            Color fundo = selecionada ? _azul : _azulClaro;
-            Color texto = selecionada
+            Color corFundo = selecionada
+                ? _corAzul
+                : _corAzulClaro;
+
+            Color corTexto = selecionada
                 ? Color.White
-                : _textoEscuro;
+                : _corTexto;
 
-            using (SolidBrush pincel = new(fundo))
+            DesenharFundoAba(
+                e.Graphics,
+                area,
+                corFundo);
+
+            DesenharTextoAba(
+                e.Graphics,
+                e.Index,
+                area,
+                corTexto);
+
+            if (selecionada)
             {
-                e.Graphics.FillRectangle(pincel, area);
+                DesenharIndicadorAba(
+                    e.Graphics,
+                    area);
             }
+        }
 
+        // Preenche o fundo da aba.
+        private static void DesenharFundoAba(
+            Graphics grafico,
+            Rectangle area,
+            Color cor)
+        {
+            using SolidBrush pincel = new(cor);
+
+            grafico.FillRectangle(pincel, area);
+        }
+
+        // Centraliza o texto dentro da aba.
+        private void DesenharTextoAba(
+            Graphics grafico,
+            int indice,
+            Rectangle area,
+            Color corTexto)
+        {
             Rectangle areaTexto =
                 Rectangle.Inflate(area, -10, -4);
 
             TextRenderer.DrawText(
-                e.Graphics,
-                _abas.TabPages[e.Index].Text,
+                grafico,
+                _abas.TabPages[indice].Text,
                 _abas.Font,
                 areaTexto,
-                texto,
+                corTexto,
                 TextFormatFlags.HorizontalCenter |
                 TextFormatFlags.VerticalCenter |
                 TextFormatFlags.SingleLine |
-                TextFormatFlags.EndEllipsis
-            );
-
-            // Linha inferior para identificar a aba ativa.
-            if (selecionada)
-            {
-                using Pen linha = new(_textoEscuro, 3);
-
-                e.Graphics.DrawLine(
-                    linha,
-                    area.Left + 2,
-                    area.Bottom - 2,
-                    area.Right - 3,
-                    area.Bottom - 2
-                );
-            }
+                TextFormatFlags.EndEllipsis);
         }
 
-        // =====================================================
-        // GERENCIAMENTO DE DISCIPLINAS
-        // =====================================================
+        // Destaca visualmente a aba selecionada.
+        private void DesenharIndicadorAba(
+            Graphics grafico,
+            Rectangle area)
+        {
+            using Pen linha = new(_corTexto, 3);
 
+            grafico.DrawLine(
+                linha,
+                area.Left + 2,
+                area.Bottom - 2,
+                area.Right - 3,
+                area.Bottom - 2);
+        }
+
+        // Carrega o gerenciamento apenas quando necessário.
         private void CarregarGerenciamento()
         {
-            // Reutiliza a instância caso já tenha sido criada.
-            if (_gerenciamento != null &&
-                !_gerenciamento.IsDisposed)
+            if (FormularioEstaDisponivel(_gerenciamento))
             {
                 return;
             }
 
-            // O formulário original mantém cadastro,
-            // pesquisa, edição, SQL Server e auditoria.
             _gerenciamento =
                 new FrmGerenciarDisciplinas(_usuario);
 
@@ -187,20 +223,14 @@ namespace PIM_IV.Painel_ADM.Forms
                 _abaGerenciar);
         }
 
-        // =====================================================
-        // VINCULAÇÃO DE DISCIPLINAS
-        // =====================================================
-
+        // Carrega a vinculação apenas quando necessário.
         private void CarregarVinculacao()
         {
-            if (_vinculacao != null &&
-                !_vinculacao.IsDisposed)
+            if (FormularioEstaDisponivel(_vinculacao))
             {
                 return;
             }
 
-            // O formulário original mantém vinculação,
-            // desvinculação e suas regras de negócio.
             _vinculacao =
                 new FrmVincularDisciplinas(_usuario);
 
@@ -209,27 +239,25 @@ namespace PIM_IV.Painel_ADM.Forms
                 _abaVincular);
         }
 
-        // =====================================================
-        // EXIBIÇÃO DE FORMULÁRIOS DENTRO DAS ABAS
-        // =====================================================
+        // Verifica se o formulário já foi criado e continua ativo.
+        private static bool FormularioEstaDisponivel(
+            Form? formulario)
+        {
+            return formulario != null &&
+                   !formulario.IsDisposed;
+        }
 
+        // Exibe um formulário dentro da aba correspondente.
         private static void IncorporarFormulario(
             Form formulario,
             TabPage aba)
         {
-            // Permite incorporar o formulário como um controle.
             formulario.TopLevel = false;
-
-            // Remove a barra de título da janela interna.
-            formulario.FormBorderStyle =
-                FormBorderStyle.None;
-
-            // Faz o conteúdo preencher o espaço disponível.
+            formulario.FormBorderStyle = FormBorderStyle.None;
             formulario.Dock = DockStyle.Fill;
 
             aba.Controls.Add(formulario);
 
-            // Exibe o formulário dentro da aba.
             formulario.Show();
             formulario.BringToFront();
         }

@@ -1,5 +1,4 @@
-﻿
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Repositorios;
@@ -10,28 +9,52 @@ using System.Linq;
 
 namespace PIM_IV.Painel_ADM.Servicos
 {
+    // Aplica as regras de negócio relacionadas aos usuários.
     public class UsuarioService
     {
-        private readonly UsuarioRepository _repositorio = new();
+        private const int PerfilAdministrador = 1;
+        private const int TamanhoMaximoNome = 150;
+        private const int TamanhoMaximoLogin = 100;
+        private const int TamanhoMinimoSenha = 8;
+        private const int TamanhoMaximoSenha = 128;
 
-        // Verifica se ja existe um administrador no sistema
+        private readonly UsuarioRepository _repositorio;
+
+        // Permite utilizar o repositório padrão.
+        public UsuarioService()
+            : this(new UsuarioRepository())
+        {
+        }
+
+        // Recebe o repositório utilizado pelo serviço.
+        public UsuarioService(UsuarioRepository repositorio)
+        {
+            _repositorio = repositorio
+                ?? throw new ArgumentNullException(nameof(repositorio));
+        }
+
+        // Verifica se já existe um administrador cadastrado.
         public bool ExisteAdministrador()
         {
             const string sql = @"
                 SELECT COUNT(1)
                 FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p ON u.IdPerfil = p.IdPerfil
-                WHERE p.NomePerfil = 'Administrador'";
+                INNER JOIN dbo.Perfis p
+                    ON u.IdPerfil = p.IdPerfil
+                WHERE p.NomePerfil = N'Administrador'";
 
-            using SqlConnection conexao = Conexao.CriarConexao();
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
+
             using SqlCommand comando = new(sql, conexao);
 
             conexao.Open();
 
-            return Convert.ToInt32(comando.ExecuteScalar()) > 0;
+            return Convert.ToInt32(
+                comando.ExecuteScalar()) > 0;
         }
 
-        // Cadastro do primeiro administrador
+        // Cadastra o primeiro administrador do sistema.
         public void CadastrarAdministradorInicial(
             string nomeCompleto,
             string login,
@@ -39,9 +62,14 @@ namespace PIM_IV.Painel_ADM.Servicos
         {
             ValidarDados(nomeCompleto, login, senha);
 
+            string nomeValidado = nomeCompleto.Trim();
+            string loginValidado = login.Trim();
+
             string hash = SenhaHelper.GerarHash(senha);
 
-            using SqlConnection conexao = Conexao.CriarConexao();
+            using SqlConnection conexao =
+                Conexao.CriarConexao();
+
             conexao.Open();
 
             using SqlTransaction transacao =
@@ -49,76 +77,142 @@ namespace PIM_IV.Painel_ADM.Servicos
 
             try
             {
-                const string sqlPerfil = @"
-                    SELECT IdPerfil
-                    FROM dbo.Perfis
-                    WHERE NomePerfil = 'Administrador'
-                      AND Ativo = 1";
+                int idPerfil = ConsultarPerfilAdministrador(
+                    conexao,
+                    transacao);
 
-                using SqlCommand cmdPerfil =
-                    new(sqlPerfil, conexao, transacao);
+                VerificarAdministradorInicial(
+                    conexao,
+                    transacao,
+                    idPerfil);
 
-                object? resultado = cmdPerfil.ExecuteScalar();
-
-                if (resultado == null)
-                    throw new InvalidOperationException(
-                        "O perfil Administrador não foi encontrado.");
-
-                int idPerfil = Convert.ToInt32(resultado);
-
-                const string sqlVerificar = @"
-                    SELECT COUNT(1)
-                    FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
-                    WHERE IdPerfil = @IdPerfil";
-
-                using SqlCommand cmdVerificar =
-                    new(sqlVerificar, conexao, transacao);
-
-                cmdVerificar.Parameters.Add("@IdPerfil", SqlDbType.Int)
-                    .Value = idPerfil;
-
-                if (Convert.ToInt32(cmdVerificar.ExecuteScalar()) > 0)
-                    throw new InvalidOperationException(
-                        "O administrador inicial já foi cadastrado.");
-
-                const string sqlInserir = @"
-                    INSERT INTO dbo.Usuarios
-                        (NomeCompleto, Login, SenhaHash, IdPerfil, Ativo)
-                    VALUES
-                        (@Nome, @Login, @Hash, @IdPerfil, 1)";
-
-                using SqlCommand cmdInserir =
-                    new(sqlInserir, conexao, transacao);
-
-                cmdInserir.Parameters.Add(
-                    "@Nome", SqlDbType.NVarChar, 150)
-                    .Value = nomeCompleto.Trim();
-
-                cmdInserir.Parameters.Add(
-                    "@Login", SqlDbType.NVarChar, 100)
-                    .Value = login.Trim();
-
-                cmdInserir.Parameters.Add(
-                    "@Hash", SqlDbType.NVarChar, 500)
-                    .Value = hash;
-
-                cmdInserir.Parameters.Add(
-                    "@IdPerfil", SqlDbType.Int)
-                    .Value = idPerfil;
-
-                cmdInserir.ExecuteNonQuery();
+                InserirAdministradorInicial(
+                    conexao,
+                    transacao,
+                    nomeValidado,
+                    loginValidado,
+                    hash,
+                    idPerfil);
 
                 transacao.Commit();
             }
             catch
             {
-                transacao.Rollback();
+                if (transacao.Connection != null)
+                {
+                    transacao.Rollback();
+                }
+
                 throw;
             }
         }
 
-        // Administrador cadastra um usuario e define sua senha
-        // Retorna o login definitivo, incluindo RA, RP ou RC.
+        // Consulta o identificador do perfil Administrador.
+        private static int ConsultarPerfilAdministrador(
+            SqlConnection conexao,
+            SqlTransaction transacao)
+        {
+            const string sql = @"
+                SELECT IdPerfil
+                FROM dbo.Perfis
+                WHERE NomePerfil = N'Administrador'
+                  AND Ativo = 1";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            object? resultado = comando.ExecuteScalar();
+
+            if (resultado == null || resultado == DBNull.Value)
+            {
+                throw new InvalidOperationException(
+                    "O perfil Administrador não foi encontrado.");
+            }
+
+            return Convert.ToInt32(resultado);
+        }
+
+        // Impede o cadastro duplicado do administrador inicial.
+        private static void VerificarAdministradorInicial(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            int idPerfil)
+        {
+            const string sql = @"
+                SELECT COUNT(1)
+                FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
+                WHERE IdPerfil = @IdPerfil";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@IdPerfil",
+                SqlDbType.Int).Value = idPerfil;
+
+            bool administradorExiste =
+                Convert.ToInt32(comando.ExecuteScalar()) > 0;
+
+            if (administradorExiste)
+            {
+                throw new InvalidOperationException(
+                    "O administrador inicial já foi cadastrado.");
+            }
+        }
+
+        // Insere os dados do primeiro administrador.
+        private static void InserirAdministradorInicial(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            string nomeCompleto,
+            string login,
+            string hash,
+            int idPerfil)
+        {
+            const string sql = @"
+                INSERT INTO dbo.Usuarios
+                (
+                    NomeCompleto,
+                    Login,
+                    SenhaHash,
+                    IdPerfil,
+                    Ativo
+                )
+                VALUES
+                (
+                    @Nome,
+                    @Login,
+                    @Hash,
+                    @IdPerfil,
+                    1
+                )";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@Nome",
+                SqlDbType.NVarChar,
+                TamanhoMaximoNome).Value = nomeCompleto;
+
+            comando.Parameters.Add(
+                "@Login",
+                SqlDbType.NVarChar,
+                TamanhoMaximoLogin).Value = login;
+
+            comando.Parameters.Add(
+                "@Hash",
+                SqlDbType.NVarChar,
+                500).Value = hash;
+
+            comando.Parameters.Add(
+                "@IdPerfil",
+                SqlDbType.Int).Value = idPerfil;
+
+            comando.ExecuteNonQuery();
+        }
+
+        // Cadastra um usuário e retorna seu login definitivo.
         public string CadastrarUsuario(
             Usuario administrador,
             string nomeCompleto,
@@ -128,58 +222,70 @@ namespace PIM_IV.Painel_ADM.Servicos
         {
             ValidarAdministrador(administrador);
             ValidarPerfil(idPerfil);
-
-            if (string.IsNullOrWhiteSpace(nomeCompleto))
-                throw new ArgumentException(
-                    "Informe o nome completo.");
-
-            if (nomeCompleto.Trim().Length > 150)
-                throw new ArgumentException(
-                    "O nome excede 150 caracteres.");
-
+            ValidarNome(nomeCompleto);
             ValidarSenha(senha);
 
-            // Somente o Administrador define seu login.
-            if (idPerfil == 1)
+            bool administradorNovo =
+                idPerfil == PerfilAdministrador;
+
+            if (administradorNovo)
             {
                 ValidarNomeLogin(nomeCompleto, login);
 
                 if (_repositorio.LoginExiste(login.Trim()))
+                {
                     throw new ArgumentException(
                         "Este login já está cadastrado.");
+                }
             }
 
-            Usuario novoUsuario = new()
-            {
-                NomeCompleto = nomeCompleto.Trim(),
-                Login = idPerfil == 1
-                    ? login.Trim()
-                    : string.Empty,
-                SenhaHash = SenhaHelper.GerarHash(senha),
-                IdPerfil = idPerfil,
-                Ativo = true
-            };
+            Usuario novoUsuario = CriarUsuario(
+                nomeCompleto,
+                login,
+                senha,
+                idPerfil);
 
             try
             {
-                // O repositorio gera RA, RP ou RC
-                // usando o IdUsuario do SQL Server.
                 _repositorio.Cadastrar(
                     novoUsuario,
                     administrador.IdUsuario);
 
                 return novoUsuario.Login;
             }
-            catch (SqlException ex) when (
-                ex.Number == 2601 || ex.Number == 2627)
+            catch (SqlException ex) when (LoginDuplicado(ex))
             {
                 throw new ArgumentException(
                     "O identificador já está cadastrado. " +
-                    "Verifique os dados e tente novamente.");
+                    "Verifique os dados e tente novamente.",
+                    ex);
             }
         }
 
-        // Edita dados de usuario
+        // Cria o objeto que será enviado ao repositório.
+        private static Usuario CriarUsuario(
+            string nomeCompleto,
+            string login,
+            string senha,
+            int idPerfil)
+        {
+            return new Usuario
+            {
+                NomeCompleto = nomeCompleto.Trim(),
+
+                Login = idPerfil == PerfilAdministrador
+                    ? login.Trim()
+                    : string.Empty,
+
+                SenhaHash = SenhaHelper.GerarHash(senha),
+
+                IdPerfil = idPerfil,
+
+                Ativo = true
+            };
+        }
+
+        // Atualiza os dados cadastrais de um usuário.
         public void EditarUsuario(
             Usuario administrador,
             int idUsuario,
@@ -200,15 +306,15 @@ namespace PIM_IV.Painel_ADM.Servicos
                     login.Trim(),
                     idPerfil);
             }
-            catch (SqlException ex) when (
-                ex.Number == 2601 || ex.Number == 2627)
+            catch (SqlException ex) when (LoginDuplicado(ex))
             {
                 throw new ArgumentException(
-                    "Este login já pertence a outro usuário.");
+                    "Este login já pertence a outro usuário.",
+                    ex);
             }
         }
 
-        // Ativa ou desativa uma conta
+        // Ativa ou desativa uma conta de usuário.
         public void AlterarStatusUsuario(
             Usuario administrador,
             int idUsuario,
@@ -222,17 +328,23 @@ namespace PIM_IV.Painel_ADM.Servicos
                 novoStatus);
         }
 
-        // Regras obrigatorias para qualquer nova senha
+        // Identifica violações de unicidade no SQL Server.
+        private static bool LoginDuplicado(SqlException ex)
+        {
+            return ex.Number == 2601 || ex.Number == 2627;
+        }
+
+        // Valida as regras obrigatórias de segurança da senha.
         public static void ValidarSenha(string senha)
         {
             if (string.IsNullOrEmpty(senha) ||
-                senha.Length < 8)
+                senha.Length < TamanhoMinimoSenha)
             {
                 throw new ArgumentException(
                     "A senha deve ter no mínimo 8 caracteres.");
             }
 
-            if (senha.Length > 128)
+            if (senha.Length > TamanhoMaximoSenha)
             {
                 throw new ArgumentException(
                     "A senha deve ter no máximo 128 caracteres.");
@@ -263,11 +375,12 @@ namespace PIM_IV.Painel_ADM.Servicos
             }
         }
 
-        // Verifica se o usuario da sessao e Administrador
+        // Verifica se o usuário da sessão é administrador.
         private static void ValidarAdministrador(
             Usuario administrador)
         {
-            if (administrador.IdPerfil != 1 ||
+            if (administrador == null ||
+                administrador.IdPerfil != PerfilAdministrador ||
                 !administrador.Ativo)
             {
                 throw new UnauthorizedAccessException(
@@ -275,7 +388,7 @@ namespace PIM_IV.Painel_ADM.Servicos
             }
         }
 
-        // Verifica se o perfil esta ativo
+        // Confirma se o perfil selecionado está ativo.
         private void ValidarPerfil(int idPerfil)
         {
             DataTable perfis = _repositorio.ListarPerfis();
@@ -291,10 +404,8 @@ namespace PIM_IV.Painel_ADM.Servicos
             }
         }
 
-        // Validacao de nome e login
-        private static void ValidarNomeLogin(
-            string nomeCompleto,
-            string login)
+        // Valida o nome completo do usuário.
+        private static void ValidarNome(string nomeCompleto)
         {
             if (string.IsNullOrWhiteSpace(nomeCompleto))
             {
@@ -302,21 +413,39 @@ namespace PIM_IV.Painel_ADM.Servicos
                     "Informe o nome completo.");
             }
 
+            if (nomeCompleto.Trim().Length > TamanhoMaximoNome)
+            {
+                throw new ArgumentException(
+                    "O nome excede 150 caracteres.");
+            }
+        }
+
+        // Valida o login informado.
+        private static void ValidarLogin(string login)
+        {
             if (string.IsNullOrWhiteSpace(login))
             {
                 throw new ArgumentException(
                     "Informe o login.");
             }
 
-            if (nomeCompleto.Trim().Length > 150 ||
-                login.Trim().Length > 100)
+            if (login.Trim().Length > TamanhoMaximoLogin)
             {
                 throw new ArgumentException(
-                    "Nome ou login excede o tamanho permitido.");
+                    "O login excede 100 caracteres.");
             }
         }
 
-        // Validacao utilizada no cadastro inicial
+        // Valida o nome e o login.
+        private static void ValidarNomeLogin(
+            string nomeCompleto,
+            string login)
+        {
+            ValidarNome(nomeCompleto);
+            ValidarLogin(login);
+        }
+
+        // Valida os dados do cadastro inicial.
         private static void ValidarDados(
             string nomeCompleto,
             string login,
