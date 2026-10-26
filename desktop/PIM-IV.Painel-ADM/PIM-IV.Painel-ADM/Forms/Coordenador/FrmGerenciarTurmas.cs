@@ -48,8 +48,8 @@ namespace PIM_IV.Painel_ADM.Forms
 
             Text = "PIM IV - Gerenciamento de Turmas";
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(1180, 780);
-            MinimumSize = new Size(950, 680);
+            Size = new Size(1050, 540);
+            MinimumSize = new Size(800, 440);
             BackColor = _fundo;
             Font = new Font("Segoe UI", 10);
 
@@ -104,25 +104,25 @@ namespace PIM_IV.Painel_ADM.Forms
             TableLayoutPanel principal = new()
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(24),
+                Padding = new Padding(12),
                 ColumnCount = 1,
                 RowCount = 5
             };
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 70));
+                new RowStyle(SizeType.Absolute, 52));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 215));
+                new RowStyle(SizeType.Absolute, 205));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 65));
+                new RowStyle(SizeType.Absolute, 52));
 
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 42));
+                new RowStyle(SizeType.Absolute, 32));
 
             Controls.Add(principal);
 
@@ -162,7 +162,7 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
-                Padding = new Padding(18)
+                Padding = new Padding(12)
             };
 
             principal.Controls.Add(painel, 0, 1);
@@ -193,7 +193,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 new RowStyle(SizeType.Absolute, 42));
 
             campos.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 62));
+                new RowStyle(SizeType.Absolute, 48));
 
             campos.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
@@ -353,7 +353,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
                 AutoScroll = true,
-                Padding = new Padding(0, 12, 0, 0)
+                Padding = new Padding(0, 5, 0, 0)
             };
 
             txtPesquisa = new TextBox
@@ -503,9 +503,7 @@ namespace PIM_IV.Painel_ADM.Forms
                         OR NomeTurma LIKE @Texto
                         OR Periodo LIKE @Texto
                     ORDER BY
-                        AnoLetivo DESC,
-                        Semestre DESC,
-                        NomeTurma";
+                        CodigoTurma ASC";
 
                 using SqlConnection conexao =
                     Conexao.CriarConexao();
@@ -749,6 +747,12 @@ namespace PIM_IV.Painel_ADM.Forms
                         codigo,
                         _idTurmaSelecionada);
 
+                    ValidarNomeDisponivel(
+                        conexao,
+                        transacao,
+                        nome,
+                        _idTurmaSelecionada);
+
                     int idRegistrado = GravarTurma(
                         conexao,
                         transacao,
@@ -830,6 +834,42 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 throw new InvalidOperationException(
                     "Já existe uma turma com esse código.");
+            }
+        }
+
+        // Impede nomes de turma repetidos, inclusive durante a edição.
+        private static void ValidarNomeDisponivel(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            string nome,
+            int? idTurma)
+        {
+            const string sql = @"
+                SELECT COUNT(1)
+                FROM dbo.Turmas WITH (UPDLOCK, HOLDLOCK)
+                WHERE UPPER(LTRIM(RTRIM(NomeTurma))) =
+                      UPPER(LTRIM(RTRIM(@Nome)))
+                  AND IdTurma <> @IdTurma";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@Nome",
+                SqlDbType.NVarChar,
+                100).Value = nome;
+
+            comando.Parameters.Add(
+                "@IdTurma",
+                SqlDbType.Int).Value = idTurma ?? -1;
+
+            int quantidade =
+                Convert.ToInt32(comando.ExecuteScalar());
+
+            if (quantidade > 0)
+            {
+                throw new InvalidOperationException(
+                    "Já existe uma turma cadastrada com esse nome.");
             }
         }
 

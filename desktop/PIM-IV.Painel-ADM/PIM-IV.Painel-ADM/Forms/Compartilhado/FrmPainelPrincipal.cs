@@ -13,8 +13,8 @@ namespace PIM_IV.Painel_ADM
         private const int PerfilCoordenador = 2;
 
         private const int LarguraMenu = 245;
-        private const int AlturaCabecalho = 75;
-        private const int EspacamentoMenu = 55;
+        private const int AlturaCabecalho = 65;
+        private const int EspacamentoMenu = 50;
 
         private readonly Usuario _usuario;
         private readonly PermissaoService _permissaoService = new();
@@ -55,7 +55,7 @@ namespace PIM_IV.Painel_ADM
 
             StartPosition = FormStartPosition.CenterScreen;
             WindowState = FormWindowState.Maximized;
-            MinimumSize = new Size(900, 600);
+            MinimumSize = new Size(800, 540);
 
             AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = _fundo;
@@ -510,7 +510,7 @@ namespace PIM_IV.Painel_ADM
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                Padding = new Padding(30, 25, 30, 25),
+                Padding = new Padding(20, 18, 20, 18),
                 BackColor = _fundo
             };
 
@@ -518,7 +518,7 @@ namespace PIM_IV.Painel_ADM
                 new ColumnStyle(SizeType.Percent, 100));
 
             estrutura.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 120));
+                new RowStyle(SizeType.Absolute, 105));
 
             estrutura.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
@@ -691,10 +691,10 @@ namespace PIM_IV.Painel_ADM
         {
             Panel cartao = new()
             {
-                Size = new Size(265, 165),
+                Size = new Size(250, 150),
                 BackColor = Color.White,
                 Cursor = Cursors.Hand,
-                Margin = new Padding(5, 5, 20, 20)
+                Margin = new Padding(5, 5, 15, 15)
             };
 
             Label lblTitulo = new()

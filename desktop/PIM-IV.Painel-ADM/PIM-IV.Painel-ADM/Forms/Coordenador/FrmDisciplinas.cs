@@ -21,6 +21,8 @@ namespace PIM_IV.Painel_ADM.Forms
         private readonly TabPage _abaGerenciar = new();
         private readonly TabPage _abaVincular = new();
 
+        private int _indiceAbaHover = -1;
+
         private FrmGerenciarDisciplinas? _gerenciamento;
         private FrmVincularDisciplinas? _vinculacao;
 
@@ -93,10 +95,43 @@ namespace PIM_IV.Painel_ADM.Forms
         private void ConfigurarEventos()
         {
             _abas.DrawItem += DesenharAba;
+            _abas.MouseMove += AoMoverMouseSobreAbas;
+            _abas.MouseLeave += AoSairMouseDasAbas;
 
             _abas.SelectedIndexChanged += AoSelecionarAba;
 
             Shown += (_, _) => CarregarGerenciamento();
+        }
+
+        // Atualiza o destaque quando o mouse passa sobre uma aba.
+        private void AoMoverMouseSobreAbas(object? sender, MouseEventArgs e)
+        {
+            int indice = -1;
+
+            for (int i = 0; i < _abas.TabCount; i++)
+            {
+                if (_abas.GetTabRect(i).Contains(e.Location))
+                {
+                    indice = i;
+                    break;
+                }
+            }
+
+            _abas.Cursor = indice >= 0 ? Cursors.Hand : Cursors.Default;
+
+            if (_indiceAbaHover != indice)
+            {
+                _indiceAbaHover = indice;
+                _abas.Invalidate();
+            }
+        }
+
+        // Remove o destaque ao retirar o mouse das abas.
+        private void AoSairMouseDasAbas(object? sender, EventArgs e)
+        {
+            _indiceAbaHover = -1;
+            _abas.Cursor = Cursors.Default;
+            _abas.Invalidate();
         }
 
         // Identifica qual funcionalidade deve ser exibida.
@@ -134,7 +169,9 @@ namespace PIM_IV.Painel_ADM.Forms
 
             Color corFundo = selecionada
                 ? _corAzul
-                : _corAzulClaro;
+                : e.Index == _indiceAbaHover
+                    ? Color.FromArgb(178, 205, 238)
+                    : _corAzulClaro;
 
             Color corTexto = selecionada
                 ? Color.White

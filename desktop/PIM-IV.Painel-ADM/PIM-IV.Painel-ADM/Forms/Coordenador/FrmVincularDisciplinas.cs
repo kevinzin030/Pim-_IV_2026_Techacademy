@@ -48,14 +48,14 @@ namespace PIM_IV.Painel_ADM.Forms
             Shown += AoExibirFormulario;
         }
 
-        // Define as propriedades principais da janela.
+        // Define as dimensões adequadas para o notebook.
         private void ConfigurarFormulario()
         {
             Text = "PIM IV - Vinculação de Disciplinas às Turmas";
             StartPosition = FormStartPosition.CenterParent;
 
-            Size = new Size(1150, 800);
-            MinimumSize = new Size(950, 680);
+            Size = new Size(1050, 540);
+            MinimumSize = new Size(800, 440);
 
             BackColor = _fundo;
             Font = new Font("Segoe UI", 10);
@@ -115,7 +115,7 @@ namespace PIM_IV.Painel_ADM.Forms
             CriarAreaBotoes(principal);
         }
 
-        // Cria a estrutura principal do formulário.
+        // Cria a estrutura principal com espaçamentos reduzidos.
         private TableLayoutPanel CriarLayoutPrincipal()
         {
             TableLayoutPanel principal = new()
@@ -123,7 +123,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 4,
-                Padding = new Padding(20),
+                Padding = new Padding(12),
                 BackColor = _fundo
             };
 
@@ -131,16 +131,16 @@ namespace PIM_IV.Painel_ADM.Forms
                 new ColumnStyle(SizeType.Percent, 100));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 75));
+                new RowStyle(SizeType.Absolute, 55));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 125));
+                new RowStyle(SizeType.Absolute, 90));
 
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 70));
+                new RowStyle(SizeType.Absolute, 60));
 
             return principal;
         }
@@ -227,7 +227,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 1,
-                Padding = new Padding(0, 15, 0, 10)
+                Padding = new Padding(0, 8, 0, 5)
             };
 
             conteudo.ColumnStyles.Add(
@@ -338,7 +338,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 3,
-                Padding = new Padding(15),
+                Padding = new Padding(10),
                 Margin = margem,
                 BackColor = Color.White
             };
@@ -367,7 +367,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 FlowDirection = FlowDirection.RightToLeft,
                 WrapContents = false,
                 AutoScroll = true,
-                Padding = new Padding(0, 10, 0, 0)
+                Padding = new Padding(0, 5, 0, 0)
             };
 
             btnAtualizar = CriarBotao("Atualizar", 130);
@@ -512,7 +512,7 @@ namespace PIM_IV.Painel_ADM.Forms
                         NomeDisciplina AS NomeExibicao
                 FROM dbo.Disciplinas
                 WHERE Ativa = 1
-                ORDER BY NomeDisciplina";
+                ORDER BY CodigoDisciplina ASC";
 
             return ConsultarTabela(conexao, sql);
         }
@@ -647,7 +647,7 @@ namespace PIM_IV.Painel_ADM.Forms
                     ON td.IdDisciplina = d.IdDisciplina
                 WHERE td.IdTurma = @IdTurma
                   AND td.Ativa = 1
-                ORDER BY d.NomeDisciplina";
+                ORDER BY d.CodigoDisciplina ASC";
 
             using SqlConnection conexao =
                 Conexao.CriarConexao();

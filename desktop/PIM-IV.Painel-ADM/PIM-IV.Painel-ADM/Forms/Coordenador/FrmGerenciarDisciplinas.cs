@@ -54,8 +54,8 @@ namespace PIM_IV.Painel_ADM.Forms
             Text = "PIM IV - Gerenciamento de Disciplinas";
             StartPosition = FormStartPosition.CenterParent;
 
-            Size = new Size(1150, 800);
-            MinimumSize = new Size(950, 700);
+            Size = new Size(1050, 540);
+            MinimumSize = new Size(800, 440);
 
             BackColor = _corFundo;
             Font = new Font("Segoe UI", 10);
@@ -109,25 +109,25 @@ namespace PIM_IV.Painel_ADM.Forms
             TableLayoutPanel principal = new()
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20),
+                Padding = new Padding(12),
                 ColumnCount = 1,
                 RowCount = 5
             };
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 65));
+                new RowStyle(SizeType.Absolute, 55));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 170));
+                new RowStyle(SizeType.Absolute, 150));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 60));
+                new RowStyle(SizeType.Absolute, 50));
 
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 38));
+                new RowStyle(SizeType.Absolute, 30));
 
             Controls.Add(principal);
 
@@ -164,7 +164,7 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
-                Padding = new Padding(15)
+                Padding = new Padding(10)
             };
 
             principal.Controls.Add(painel, 0, 1);
@@ -285,7 +285,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
                 AutoScroll = true,
-                Padding = new Padding(0, 10, 0, 0)
+                Padding = new Padding(0, 5, 0, 0)
             };
 
             txtPesquisa = new TextBox
@@ -427,7 +427,7 @@ namespace PIM_IV.Painel_ADM.Forms
                     WHERE @Pesquisa = ''
                        OR CodigoDisciplina LIKE @Texto
                        OR NomeDisciplina LIKE @Texto
-                    ORDER BY NomeDisciplina";
+                    ORDER BY CodigoDisciplina ASC";
 
                 using SqlConnection conexao =
                     Conexao.CriarConexao();
