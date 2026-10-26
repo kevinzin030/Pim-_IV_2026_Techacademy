@@ -651,10 +651,18 @@ namespace PIM_IV.Painel_ADM.Forms
                 {
                     ExigirAutorizacao(conexao, transacao);
 
+                    // Verifica se o código já pertence a outra disciplina.
                     ValidarCodigoDisponivel(
                         conexao,
                         transacao,
                         codigo,
+                        _idDisciplinaSelecionada);
+
+                    // Impede disciplinas com nomes duplicados.
+                    ValidarNomeDisponivel(
+                        conexao,
+                        transacao,
+                        nome,
                         _idDisciplinaSelecionada);
 
                     int idRegistrado = GravarDisciplina(
@@ -697,6 +705,14 @@ namespace PIM_IV.Painel_ADM.Forms
                 CarregarDisciplinas();
                 LimparFormulario();
             }
+            catch (InvalidOperationException ex)
+            {
+                // Apresenta mensagens amigáveis de validação.
+                ExibirMensagem(
+                    ex.Message,
+                    "Validação",
+                    MessageBoxIcon.Warning);
+            }
             catch (Exception ex)
             {
                 MostrarErro("Erro ao salvar disciplina", ex);
@@ -735,6 +751,42 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 throw new InvalidOperationException(
                     "Já existe uma disciplina com esse código.");
+            }
+        }
+
+        // Impede disciplinas com nomes repetidos.
+        private static void ValidarNomeDisponivel(
+            SqlConnection conexao,
+            SqlTransaction transacao,
+            string nome,
+            int? idDisciplina)
+        {
+            const string sql = @"
+                SELECT COUNT(1)
+                FROM dbo.Disciplinas WITH (UPDLOCK, HOLDLOCK)
+                WHERE UPPER(LTRIM(RTRIM(NomeDisciplina))) =
+                      UPPER(LTRIM(RTRIM(@Nome)))
+                  AND IdDisciplina <> @IdDisciplina";
+
+            using SqlCommand comando =
+                new(sql, conexao, transacao);
+
+            comando.Parameters.Add(
+                "@Nome",
+                SqlDbType.NVarChar,
+                150).Value = nome;
+
+            comando.Parameters.Add(
+                "@IdDisciplina",
+                SqlDbType.Int).Value = idDisciplina ?? -1;
+
+            int quantidade =
+                Convert.ToInt32(comando.ExecuteScalar());
+
+            if (quantidade > 0)
+            {
+                throw new InvalidOperationException(
+                    "Já existe uma disciplina cadastrada com esse nome.");
             }
         }
 
