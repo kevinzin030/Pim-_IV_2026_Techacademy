@@ -4,6 +4,7 @@
     <File Path=".gitignore" />
     <File Path="package-lock.json" />
     <File Path="package.json" />
+    <File Path="README.md" />
   </Folder>
   <Folder Name="/TechAcademy - API/Prisma/" />
   <Folder Name="/TechAcademy - API/Src/" />
