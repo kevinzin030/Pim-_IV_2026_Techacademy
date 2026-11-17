@@ -71,25 +71,38 @@ const state = {
     ]
 };
 
-// Usa a mesma chave do painel do professor para compartilhar aulas, quizzes e notificações neste navegador.
+// Usa os dados da sessão para que o boletim mostre somente as notas do aluno autenticado.
+try {
+    const sessaoAluno = JSON.parse(sessionStorage.getItem('usuario_logado') || 'null');
+    if (sessaoAluno && sessaoAluno.role === 'aluno') {
+        state.aluno = { ...state.aluno, ...sessaoAluno, matricula: sessaoAluno.matricula };
+    }
+} catch (error) { console.warn('Não foi possível recuperar a sessão do aluno.', error); }
+
+// Usa a mesma chave do painel do professor para compartilhar aulas, quizzes, notas e notificações neste navegador.
 const STORAGE_KEY = 'techacademy_shared_v1';
 state.notificacoes = [];
+
 /**
  * Formata valores para apresentação consistente na interface.
  */
 function dataHoraPt(valor) { if (!valor) return 'Data não registrada'; const d = new Date(valor); return Number.isNaN(d.getTime()) ? valor : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }); }
+
 /**
  * Recupera dados persistidos no navegador e prepara o estado da aplicação.
  */
 function carregarNotificacoes() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); state.notificacoes = Array.isArray(saved.notificacoes) ? saved.notificacoes : []; } catch { state.notificacoes = []; } atualizarSinoNotificacoes(); }
+
 /**
  * Atualiza os elementos da interface com os dados mais recentes.
  */
 function atualizarSinoNotificacoes() { const badge = document.getElementById('notification-count'); if (badge) { const n = (state.notificacoes || []).filter(x => !x.lida).length; badge.textContent = n > 99 ? '99+' : n; badge.classList.toggle('hidden', n === 0); } }
+
 /**
  * Renderiza a seção da interface indicada e atualiza a área principal da página.
  */
 function renderNotificacoes() { const painel = document.getElementById('notification-panel'); if (!painel) return; const lista = (state.notificacoes || []).slice().sort((a,b)=>new Date(b.dataHora)-new Date(a.dataHora)); painel.innerHTML = renderHtmlTemplate('ta-aluno-fragment-027', { "0": (lista.length ? lista.map(n=>renderHtmlTemplate('ta-aluno-fragment-029', { "0": (n.lida?'bg-slate-50':'bg-blue-50'), "1": (n.tipo==='quiz'?'Novo quiz':n.tipo==='desafio'?'Novo desafio final':'Nova aula publicada'), "2": (n.titulo), "3": (n.disciplina || ''), "4": (dataHoraPt(n.dataHora)) })).join('') : renderHtmlTemplate('ta-aluno-fragment-028')) }); const marcar=document.getElementById('marcar-notificacoes-lidas'); if(marcar) marcar.onclick=()=>{state.notificacoes=(state.notificacoes||[]).map(n=>({...n,lida:true})); const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); localStorage.setItem(STORAGE_KEY,JSON.stringify({...saved,notificacoes:state.notificacoes})); renderNotificacoes(); atualizarSinoNotificacoes();}; }
+
 /**
  * Persiste o estado atual no armazenamento local do navegador.
  */
@@ -97,6 +110,7 @@ function salvarDadosCompartilhados() {
     try { const atual = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...atual, disciplinas: state.disciplinas, notificacoes: state.notificacoes || atual.notificacoes || [] })); }
     catch (e) { console.warn('Não foi possível salvar os dados locais.', e); }
 }
+
 /**
  * Recupera dados persistidos no navegador e prepara o estado da aplicação.
  */
@@ -121,8 +135,10 @@ window.addEventListener('DOMContentLoaded', () => {
     carregarDadosCompartilhados();
     carregarNotificacoes();
     bindNavEvents();
-    // Delegação de eventos: os elementos podem vir de templates HTML inseridos depois do carregamento.
-    // Assim, o HTML descreve os controles e este arquivo concentra toda a lógica de interação.
+    
+    // Verifica se o aluno atingiu o limite crítico de faltas ao carregar a página
+    verificarAlertaFaltasCriticas();
+
     document.addEventListener('click', (event) => {
         const alvoAcao = event.target.closest('[data-action]');
         if (alvoAcao) {
@@ -158,7 +174,7 @@ window.addEventListener('DOMContentLoaded', () => {
 function bindNavEvents() {
     document.getElementById('nav-disciplinas').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderDisciplinas, 'Disciplinas & Aulas'));
     document.getElementById('nav-quizzes').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderQuizzes, 'Questionários & Desafios'));
-    document.getElementById('nav-boletim').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderBoletim, 'Meu Boletim / Notas'));
+    document.getElementById('nav-boletim').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderBoletim, 'Meu Boletim / Notas & Faltas'));
     document.getElementById('nav-perfil').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderPerfil, 'Meu Perfil'));
 }
 
@@ -225,13 +241,7 @@ function abrirQuiz(discId, quizId) {
     if (form) form.addEventListener('submit', e => { e.preventDefault(); const respostas = perguntas.map((p,i)=>Number(new FormData(form).get(`pergunta-${i}`))); const acertos = respostas.reduce((n,r,i)=>n+(r===Number(perguntas[i].correta)?1:0),0); quiz.respondido = true; quiz.pontuacao = acertos; const xpGanho = Math.round(quiz.xp * acertos / perguntas.length); state.aluno.xp += xpGanho; state.aluno.streak += 1; salvarDadosCompartilhados(); updateGamificationWidget(); main.innerHTML = renderHtmlTemplate('ta-aluno-fragment-008', { "0": (acertos), "1": (perguntas.length), "2": (xpGanho), "3": (disc.id) }); });
 }
 
-/**
- * Processa as respostas fornecidas pelo aluno e calcula o resultado.
- */
 function responderQuiz(discId, quizId) { abrirQuiz(discId, quizId); }
-/**
- * Executa uma etapa específica da lógica da plataforma; os elementos visuais correspondentes estão definidos no HTML.
- */
 function fazerDownloadPdf(nomeArquivo) { showToast(`O PDF '${nomeArquivo}' ainda não está anexado a esta aula.`); }
 
 /**
@@ -243,29 +253,166 @@ function renderQuizzes() {
     main.innerHTML = renderHtmlTemplate('ta-aluno-fragment-005', { "0": (items.length ? items.map(({d,q}) => renderHtmlTemplate('ta-aluno-fragment-007', { "0": (q.titulo), "1": (d.nome), "2": ((q.perguntas || []).length || 1), "3": (q.xp), "4": (dataHoraPt(q.dataHora)), "5": (q.respondido ? 'text-emerald-700' : 'text-amber-700'), "6": (q.respondido ? 'Concluído' : 'Pendente'), "7": (d.id), "8": (q.id), "9": (q.respondido ? 'Ver resultado' : 'Acessar quiz') })).join('') : renderHtmlTemplate('ta-aluno-fragment-006')) });
 }
 
-/**
- * Processa as respostas fornecidas pelo aluno e calcula o resultado.
- */
 function responderQuizGeral(discId, quizId) { abrirQuiz(discId, quizId); }
 
 /**
- * Renderiza a seção da interface indicada e atualiza a área principal da página.
+ * Renderiza a seção do Boletim unificada com o controle de faltas e alertas.
  */
 function renderBoletim() {
     const main = document.getElementById('main-content-area');
-    main.innerHTML = renderHtmlTemplate('ta-aluno-fragment-003', { "0": (state.disciplinas.map(d => {
-                        const m = calcularMedia(d.notas.p1, d.notas.p2, d.notas.trabalho, d.notas.quizzes);
-                        let statusBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                        let statusTxt = 'Aprovado';
-                        if (m < 5.0) {
-                            statusBg = 'bg-red-100 text-red-800 border-red-200';
-                            statusTxt = 'Reprovado';
-                        } else if (m < 7.0) {
-                            statusBg = 'bg-amber-100 text-amber-800 border-amber-200';
-                            statusTxt = 'Exame';
-                        }
-                        return renderHtmlTemplate('ta-aluno-fragment-004', { "0": (d.nome), "1": (d.notas.p1.toFixed(1)), "2": (d.notas.p2.toFixed(1)), "3": (d.notas.trabalho.toFixed(1)), "4": (d.notas.quizzes.toFixed(1)), "5": (m), "6": (statusBg), "7": (statusTxt) });
-                    }).join('')) });
+    let dados = {};
+    try { dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (error) { console.warn(error); }
+    const matricula = String(state.aluno.matricula || '2023001');
+    const gradebook = dados.gradebook || {};
+    
+    // Recupera faltas salvas pelo professor
+    const dadosFaltas = JSON.parse(localStorage.getItem('techacademy_faltas')) || {};
+
+    const notasPublicadas = Object.values(gradebook)
+        .map(registros => registros && registros[matricula])
+        .filter(registro => registro && registro.publicado && registro.notas);
+
+    if (!notasPublicadas.length && Object.keys(dadosFaltas).length === 0) {
+        main.innerHTML = renderHtmlTemplate('ta-aluno-fragment-030');
+        return;
+    }
+
+    // HTML da seção combinando Notas e Faltas
+    main.innerHTML = `
+        <div class="space-y-6">
+            <div id="alerta-faltas-critico" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-sm flex items-start gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl mt-0.5"></i>
+                <div>
+                    <h4 class="text-sm font-bold text-red-800">Atenção Crítica: Limite de Faltas Excedido!</h4>
+                    <p class="text-xs text-red-700 mt-0.5">Você acumulou 15 ou mais faltas em uma ou mais disciplinas. Procure a coordenação pedagógica.</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-clipboard-user text-brand-blue"></i> Extrato de Faltas por Disciplina
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="extrato-faltas-cards">
+                    <!-- Cards de faltas inseridos via JS -->
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-brand-blue"></i> Boletim Acadêmico
+                </h3>
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full min-w-[700px] text-left border-collapse boletim-table">
+                        <thead>
+                            <tr class="bg-blue-50 text-slate-600 text-xs font-bold uppercase border-b border-blue-100">
+                                <th class="p-3">Disciplina</th>
+                                <th class="p-3 w-20">P1</th>
+                                <th class="p-3 w-20">P2</th>
+                                <th class="p-3 w-24">Trabalho</th>
+                                <th class="p-3 w-20">Quizzes</th>
+                                <th class="p-3 w-20 text-center">Média</th>
+                                <th class="p-3 w-28 text-center">Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Preenche os cards de faltas
+    const containerFaltas = document.getElementById('extrato-faltas-cards');
+    const disciplinasMapa = {
+        'web': 'Desenvolvimento Web & UX',
+        'db': 'Banco de Dados'
+    };
+
+    let htmlFaltasCards = '';
+    Object.keys(disciplinasMapa).forEach(discId => {
+        const nomeDisc = disciplinasMapa[discId];
+        const regAluno = dadosFaltas[discId]?.[matricula] || { total: 0 };
+        const totalFaltas = regAluno.total || 0;
+
+        const corBadge = totalFaltas >= 15 ? 'bg-red-100 text-red-800 border-red-200 font-bold animate-pulse' : totalFaltas >= 10 ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-50 text-brand-blue border-blue-100';
+
+        htmlFaltasCards += `
+            <div class="p-4 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between">
+                <div>
+                    <h4 class="font-bold text-slate-800 text-xs">${nomeDisc}</h4>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Limite máximo permitido: 15 faltas</p>
+                </div>
+                <div>
+                    <span class="px-3 py-1 rounded-full text-xs border ${corBadge}">
+                        ${totalFaltas} Falta(s)
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+    containerFaltas.innerHTML = htmlFaltasCards;
+
+    // Preenche a tabela de notas
+    const tbody = main.querySelector('.boletim-table tbody');
+    if (!tbody) return;
+
+    notasPublicadas.forEach((registro) => {
+        const n = registro.notas || {};
+        const valores = [n.p1, n.p2, n.trabalho, n.quizzes].map(valor => Number(valor) || 0);
+        const m = Number(calcularMedia(valores[0], valores[1], valores[2], valores[3]));
+        let status = 'Aprovado';
+        let statusClass = 'status-aprovado text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full text-[10px] font-bold border border-emerald-200';
+        if (m < 5.0) { status = 'Reprovado'; statusClass = 'status-reprovado text-red-700 bg-red-50 px-2.5 py-1 rounded-full text-[10px] font-bold border border-red-200'; }
+        else if (m < 7.0) { status = 'Exame'; statusClass = 'status-exame text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full text-[10px] font-bold border border-amber-200'; }
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100 text-xs';
+        const celulas = [
+            { texto: registro.disciplinaNome || 'Disciplina', classe: 'p-3 font-semibold text-slate-800' },
+            { texto: valores[0].toFixed(1), classe: 'p-3 font-medium' },
+            { texto: valores[1].toFixed(1), classe: 'p-3 font-medium' },
+            { texto: valores[2].toFixed(1), classe: 'p-3 font-medium' },
+            { texto: valores[3].toFixed(1), classe: 'p-3 font-medium' },
+            { texto: m.toFixed(1), classe: 'p-3 text-center font-extrabold text-brand-blue' },
+            { texto: status, classe: `p-3 text-center ${statusClass}` }
+        ];
+        celulas.forEach((item) => {
+            const td = document.createElement('td');
+            td.innerHTML = item.texto;
+            if (item.classe) td.className = item.classe;
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+
+    verificarAlertaFaltasCriticas();
+}
+
+/**
+ * Verifica se o aluno acumulou 15 ou mais faltas e ativa o banner de aviso crítico.
+ */
+function verificarAlertaFaltasCriticas() {
+    const usuarioLogado = JSON.parse(sessionStorage.getItem('usuario_logado'));
+    if (!usuarioLogado) return;
+    const matricula = usuarioLogado.matricula;
+    const dadosFaltas = JSON.parse(localStorage.getItem('techacademy_faltas')) || {};
+    let temFaltaCritica = false;
+
+    Object.keys(dadosFaltas).forEach(discId => {
+        const regAluno = dadosFaltas[discId][matricula];
+        if (regAluno && regAluno.total >= 15) {
+            temFaltaCritica = true;
+        }
+    });
+
+    const alertaDiv = document.getElementById('alerta-faltas-critico');
+    if (alertaDiv) {
+        if (temFaltaCritica) {
+            alertaDiv.classList.remove('hidden');
+        } else {
+            alertaDiv.classList.add('hidden');
+        }
+    }
 }
 
 /**
@@ -281,7 +428,6 @@ function renderPerfil() {
         a.nome = document.getElementById('aluno-nome').value;
         a.email = document.getElementById('aluno-email').value;
         
-        // Atualiza sidebar
         const nameSidebar = document.getElementById('aluno-name-sidebar');
         const emailSidebar = document.getElementById('aluno-email-sidebar');
         if (nameSidebar) nameSidebar.textContent = a.nome;
@@ -303,4 +449,16 @@ function showToast(msg) {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
 }
-document.addEventListener('DOMContentLoaded', () => { const b=document.getElementById('notification-bell'); const p=document.getElementById('notification-panel'); if(b&&p)b.addEventListener('click',()=>{p.classList.toggle('hidden');if(!p.classList.contains('hidden')&&typeof renderNotificacoes==='function')renderNotificacoes();}); });
+
+document.addEventListener('DOMContentLoaded', () => { 
+    const b=document.getElementById('notification-bell'); 
+    const p=document.getElementById('notification-panel'); 
+    if(b&&p)b.addEventListener('click',()=>{p.classList.toggle('hidden');if(!p.classList.contains('hidden')&&typeof renderNotificacoes==='function')renderNotificacoes();}); 
+});
+
+window.addEventListener('storage', (event) => { 
+    if (event.key === STORAGE_KEY || event.key === 'techacademy_faltas') {
+        if (document.getElementById('page-title')?.textContent.includes('Boletim')) renderBoletim();
+        verificarAlertaFaltasCriticas();
+    }
+});

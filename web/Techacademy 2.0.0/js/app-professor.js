@@ -92,9 +92,13 @@ const state = {
     }
 };
 
+// Mantém os valores demonstrativos como base para rascunhos de cada disciplina.
+const ALUNOS_NOTAS_PADRAO = state.alunosNotas.map(aluno => ({ ...aluno }));
+
 // Chave única compartilhada entre os painéis do professor e do aluno.
 const STORAGE_KEY = 'techacademy_shared_v1';
 state.notificacoes = [];
+
 /**
  * Registra uma ocorrência da plataforma e atualiza os dados compartilhados.
  */
@@ -106,6 +110,7 @@ function registrarNotificacao(tipo, titulo, disciplina) {
     state.notificacoes = notificacoes.slice(0, 100);
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...atual, disciplinas: state.disciplinas, notificacoes: notificacoes.slice(0, 100) }));
 }
+
 /**
  * Persiste o estado atual no armazenamento local do navegador.
  */
@@ -113,6 +118,7 @@ function salvarDadosCompartilhados() {
     try { const atual = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...atual, disciplinas: state.disciplinas, notificacoes: state.notificacoes || atual.notificacoes || [] })); }
     catch (e) { showToast('Não foi possível salvar. O PDF pode ser grande demais para o armazenamento local.'); }
 }
+
 /**
  * Recupera dados persistidos no navegador e prepara o estado da aplicação.
  */
@@ -139,6 +145,7 @@ function bindNavEvents() {
     document.getElementById('nav-postar-aula').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderPostarAula, 'Postar Slides / Aulas'));
     document.getElementById('nav-criar-quiz').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderCriarQuiz, 'Criar Quizzes & Desafio'));
     document.getElementById('nav-lancar-notas').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderLancarNotas, 'Lançar & Consultar Notas'));
+    document.getElementById('nav-lancar-faltas').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderizarSecaoFaltas, 'Lançar & Consultar Faltas'));
     document.getElementById('nav-metricas').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderMetricas, 'Métricas da Turma'));
     document.getElementById('nav-perfil').addEventListener('click', (e) => setActiveNav(e.currentTarget, renderPerfil, 'Meu Perfil'));
 }
@@ -218,10 +225,7 @@ function renderCriarQuiz() {
     main.innerHTML = renderHtmlTemplate('ta-prof-fragment-015', { "0": (state.disciplinas.map(d => renderHtmlTemplate('ta-prof-fragment-016', { "0": (d.id), "1": (d.codigo), "2": (d.nome) })).join('')), "1": (state.disciplinas.flatMap(d => d.aulas.map(a => renderHtmlTemplate('ta-prof-fragment-017', { "0": (d.id), "1": (a.id), "2": (d.codigo), "3": (a.titulo) }))).join('')), "2": (state.disciplinas.map(d => renderHtmlTemplate('ta-prof-fragment-018', { "0": (d.id), "1": (d.codigo), "2": (d.nome) })).join('')), "3": (state.disciplinas.flatMap(d => d.questionarios.map(q => renderHtmlTemplate('ta-prof-fragment-020', { "0": (q.titulo), "1": (d.codigo), "2": ((q.perguntas||[]).length || (q.pergunta?1:0)), "3": (q.xp||100), "4": (q.id), "5": (d.id) }))).join('') || renderHtmlTemplate('ta-prof-fragment-019')) });
 
     const perguntasContainer = document.getElementById('quiz-perguntas-container');
-    /**
- * Adiciona um novo elemento de formulário ou conteúdo à interface.
- */
-function adicionarPergunta() {
+    function adicionarPergunta() {
         const n = perguntasContainer.querySelectorAll('.quiz-pergunta-item').length + 1;
         const el = document.createElement('div'); el.className = 'quiz-pergunta-item p-4 border border-slate-200 rounded-xl space-y-2';
         el.innerHTML = renderHtmlTemplate('ta-prof-fragment-013', { "0": (n), "1": (n > 1 ? renderHtmlTemplate('ta-prof-fragment-014') : ''), "2": (n) });
@@ -230,10 +234,7 @@ function adicionarPergunta() {
     }
     adicionarPergunta(); document.getElementById('adicionar-pergunta').addEventListener('click', adicionarPergunta);
     const selectAula = document.getElementById('quiz-aula');
-    /**
- * Atualiza os elementos da interface com os dados mais recentes.
- */
-function atualizarAulasDoQuiz() {
+    function atualizarAulasDoQuiz() {
         const selecionada = document.getElementById('quiz-disciplina').value;
         const discAtual = state.disciplinas.find(d => d.id === selecionada);
         selectAula.innerHTML = renderHtmlTemplate('ta-prof-fragment-011', { "0": ((discAtual?.aulas || []).map(a => renderHtmlTemplate('ta-prof-fragment-012', { "0": (discAtual.id), "1": (a.id), "2": (a.titulo) })).join('')) });
@@ -291,13 +292,13 @@ function atualizarAulasDoQuiz() {
 function renderLancarNotas() {
     const main = document.getElementById('main-content-area');
     const { turmaId, disciplinaId } = state.selecaoLancarNotas;
+    if (disciplinaId) state.alunosNotas = obterNotasParaDisciplina(disciplinaId);
 
     main.innerHTML = renderHtmlTemplate('ta-prof-fragment-007', { "0": (state.turmas.map(t => renderHtmlTemplate('ta-prof-fragment-008', { "0": (t.id), "1": (t.id === turmaId ? 'selected' : ''), "2": (t.nome) })).join('')), "1": (!turmaId ? 'disabled' : ''), "2": (state.disciplinas.filter(d => d.turmaId === turmaId).map(d => renderHtmlTemplate('ta-prof-fragment-009', { "0": (d.id), "1": (d.id === disciplinaId ? 'selected' : ''), "2": (d.codigo), "3": (d.nome) })).join('')), "3": ((turmaId && disciplinaId) ? renderTabelaNotasHTML() : renderHtmlTemplate('ta-prof-fragment-010')) });
 
-    // Eventos dos Selects
     document.getElementById('select-turma').addEventListener('change', (e) => {
         state.selecaoLancarNotas.turmaId = e.target.value;
-        state.selecaoLancarNotas.disciplinaId = ''; // reseta disciplina ao trocar turma
+        state.selecaoLancarNotas.disciplinaId = '';
         renderLancarNotas();
     });
 
@@ -315,12 +316,87 @@ function renderLancarNotas() {
 /**
  * Renderiza a seção da interface indicada e atualiza a área principal da página.
  */
+function obterNotasParaDisciplina(disciplinaId) {
+    const dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const registros = dados.gradebook && dados.gradebook[disciplinaId] ? dados.gradebook[disciplinaId] : {};
+    return ALUNOS_NOTAS_PADRAO.map(aluno => ({ ...aluno, ...(registros[aluno.matricula]?.notas || {}) }));
+}
+
+function salvarNotasDaDisciplina() {
+    const disciplinaId = state.selecaoLancarNotas.disciplinaId;
+    if (!disciplinaId) { showToast('Selecione uma turma e uma disciplina antes de salvar.'); return; }
+    const inputs = [...document.querySelectorAll('.input-nota')];
+    for (const input of inputs) {
+        const valor = input.value.trim();
+        if (valor === '' || !Number.isFinite(Number(valor)) || Number(valor) < 0 || Number(valor) > 10) {
+            input.focus();
+            showToast('Preencha todas as notas com valores entre 0 e 10.');
+            return;
+        }
+    }
+    const dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    dados.gradebook = dados.gradebook || {};
+    dados.gradebook[disciplinaId] = dados.gradebook[disciplinaId] || {};
+    const disciplina = state.disciplinas.find(d => d.id === disciplinaId);
+    state.alunosNotas.forEach(aluno => {
+        const notas = { p1: Number(aluno.p1), p2: Number(aluno.p2), trabalho: Number(aluno.trabalho), quizzes: Number(aluno.quizzes) };
+        dados.gradebook[disciplinaId][aluno.matricula] = {
+            matricula: aluno.matricula,
+            nome: aluno.nome,
+            disciplinaId,
+            disciplinaNome: disciplina?.nome || 'Disciplina',
+            notas,
+            media: calcularMedia(notas.p1, notas.p2, notas.trabalho, notas.quizzes),
+            publicado: true,
+            atualizadoEm: new Date().toISOString()
+        };
+    });
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...dados, disciplinas: state.disciplinas, notificacoes: state.notificacoes || dados.notificacoes || [] }));
+        const status = document.getElementById('status-salvar-notas');
+        if (status) { status.className = 'text-[11px] bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-bold border border-emerald-200'; status.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> Notas salvas e publicadas'; }
+        showToast('Notas salvas! Os alunos já podem consultar o boletim.');
+    } catch (error) {
+        console.error('Erro ao salvar notas:', error);
+        showToast('Não foi possível salvar as notas no navegador. Verifique o espaço disponível.');
+    }
+}
+
 function renderTabelaNotasHTML() {
-    return renderHtmlTemplate('ta-prof-fragment-005', { "0": (state.alunosNotas.map((aluno, index) => {
-                        const media = calcularMedia(aluno.p1, aluno.p2, aluno.trabalho, aluno.quizzes);
-                        const sit = obterSituacao(parseFloat(media));
-                        return renderHtmlTemplate('ta-prof-fragment-006', { "0": (aluno.nome), "1": (aluno.matricula), "2": (aluno.p1), "3": (index), "4": (aluno.p2), "5": (index), "6": (aluno.trabalho), "7": (index), "8": (aluno.quizzes), "9": (index), "10": (index), "11": (media), "12": (index), "13": (sit.badge), "14": (sit.status) });
-                    }).join('')) });
+    const dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const disciplinaId = state.selecaoLancarNotas.disciplinaId;
+    const publicadas = dados.gradebook?.[disciplinaId] || {};
+    const jaPublicadas = state.alunosNotas.some(a => publicadas[a.matricula]?.publicado);
+    const linhas = state.alunosNotas.map((aluno, index) => {
+        const media = calcularMedia(Number(aluno.p1), Number(aluno.p2), Number(aluno.trabalho), Number(aluno.quizzes));
+        const sit = obterSituacao(Number(media));
+        const campo = (field, value, label) => `<td class="p-3"><label class="sr-only">${label} de ${aluno.nome}</label><input aria-label="${label} de ${aluno.nome}" type="number" step="0.1" min="0" max="10" value="${value}" data-index="${index}" data-field="${field}" class="input-nota w-full min-w-[72px] p-2 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></td>`;
+        return `<tr class="hover:bg-blue-50/50 transition border-b border-slate-100">
+            <td class="p-3 font-semibold text-slate-800 min-w-[210px]"><div>${aluno.nome}</div><div class="text-[10px] text-slate-400 font-mono mt-1">Matrícula: ${aluno.matricula}</div></td>
+            ${campo('p1', aluno.p1, 'P1')}${campo('p2', aluno.p2, 'P2')}${campo('trabalho', aluno.trabalho, 'Trabalho')}${campo('quizzes', aluno.quizzes, 'Quizzes')}
+            <td class="p-3 text-center font-extrabold text-sm text-brand-blue whitespace-nowrap" id="media-${index}">${media}</td>
+            <td class="p-3 text-center whitespace-nowrap" id="situacao-${index}"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${sit.badge}">${sit.status}</span></td>
+        </tr>`;
+    }).join('');
+    const statusClass = jaPublicadas ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+    const statusText = jaPublicadas ? 'Notas publicadas para os alunos' : 'Alterações ainda não salvas';
+    return `<section class="bg-white p-4 sm:p-6 rounded-2xl border border-blue-100 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <div><h3 class="text-base font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-list-check text-brand-blue"></i> Diário de Notas dos Alunos</h3><p class="text-xs text-slate-500 mt-1">Edite as notas e clique em Salvar notas para publicar no boletim.</p></div>
+            <span id="status-salvar-notas" class="self-start text-xs ${statusClass} px-3 py-2 rounded-full font-bold border"><i class="fa-solid fa-circle-info mr-1"></i> ${statusText}</span>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full min-w-[850px] text-left border-collapse">
+                <thead><tr class="bg-blue-50 text-slate-600 text-xs font-bold uppercase border-b border-blue-100">
+                    <th class="p-3">Aluno</th><th class="p-3 w-24">P1 (30%)</th><th class="p-3 w-24">P2 (30%)</th><th class="p-3 w-28">Trabalho (25%)</th><th class="p-3 w-24">Quizzes (15%)</th><th class="p-3 w-20 text-center">Média</th><th class="p-3 w-28 text-center">Situação</th>
+                </tr></thead><tbody>${linhas}</tbody>
+            </table>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-5">
+            <p class="text-xs text-slate-500">As notas serão vinculadas à disciplina selecionada e à matrícula de cada aluno.</p>
+            <button id="btn-salvar-notas" type="button" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm shadow-md transition focus:outline-none focus:ring-4 focus:ring-blue-200"><i class="fa-solid fa-floppy-disk"></i> Salvar notas</button>
+        </div>
+    </section>`;
 }
 
 /**
@@ -331,9 +407,11 @@ function bindTabelaNotasEvents() {
         input.addEventListener('input', (e) => {
             const idx = e.target.getAttribute('data-index');
             const field = e.target.getAttribute('data-field');
-            const val = parseFloat(e.target.value) || 0;
+            const val = parseFloat(String(e.target.value).replace(',', '.')) || 0;
 
             state.alunosNotas[idx][field] = val;
+            const status = document.getElementById('status-salvar-notas');
+            if (status) { status.className = 'text-[11px] bg-amber-50 text-amber-700 px-3 py-1 rounded-full font-bold border border-amber-200'; status.innerHTML = '<i class="fa-solid fa-pen-to-square mr-1"></i> Alterações não salvas'; }
 
             const al = state.alunosNotas[idx];
             const novaMedia = calcularMedia(al.p1, al.p2, al.trabalho, al.quizzes);
@@ -343,6 +421,7 @@ function bindTabelaNotasEvents() {
             document.getElementById(`situacao-${idx}`).innerHTML = renderHtmlTemplate('ta-prof-fragment-004', { "0": (novaSit.badge), "1": (novaSit.status) });
         });
     });
+    document.getElementById('btn-salvar-notas')?.addEventListener('click', salvarNotasDaDisciplina);
 }
 
 /**
@@ -351,7 +430,6 @@ function bindTabelaNotasEvents() {
 function renderMetricas() {
     const main = document.getElementById('main-content-area');
     
-    // Cálculos estatísticos
     const totalAlunos = state.alunosNotas.length;
     let somaMedias = 0;
     let somaQuizzes = 0;
@@ -371,7 +449,6 @@ function renderMetricas() {
 
     main.innerHTML = renderHtmlTemplate('ta-prof-fragment-003', { "0": (mediaGeralTurma), "1": (mediaQuizzesTurma), "2": (Math.round((aprovados/totalAlunos)*100)), "3": (totalAlunos), "4": (aprovados), "5": ((aprovados/totalAlunos)*100), "6": (exame), "7": ((exame/totalAlunos)*100), "8": (reprovados), "9": ((reprovados/totalAlunos)*100) });
 
-    // Os percentuais são dados calculados; o CSS define cor, altura, animação e acabamento das barras.
     main.querySelectorAll('[data-progress-percent]').forEach((barra) => {
         const percentual = Number(barra.dataset.progressPercent);
         const percentualLimitado = Math.max(0, Math.min(100, percentual));
@@ -393,7 +470,6 @@ function renderPerfil() {
         u.email = document.getElementById('perf-email').value;
         u.telefone = document.getElementById('perf-tel').value;
 
-        // Atualiza elementos do sidebar
         document.getElementById('prof-name-sidebar').textContent = u.nome;
         document.getElementById('prof-email-sidebar').textContent = u.email;
 
@@ -412,4 +488,139 @@ function showToast(msg) {
     toast.innerHTML = renderHtmlTemplate('ta-prof-fragment-001', { "0": (msg) });
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+}
+
+// --- FUNCIONALIDADE DE LANÇAMENTO DE FALTAS ---
+function renderizarSecaoFaltas() {
+    const container = document.getElementById('main-content-area');
+    
+    const turmas = [
+        { id: 'ADS-2026-2', nome: 'Análise e Desenvolvimento de Sistemas - 2º Semestre' }
+    ];
+
+    // Mantém apenas uma vez o texto de escolha padrão
+    let optionsTurmas = '';
+    turmas.forEach(t => {
+        optionsTurmas += `<option value="${t.id}">${t.nome}</option>`;
+    });
+
+    let htmlMain = document.getElementById('ta-prof-fragment-faltas-main').innerHTML
+        .replace('__TA_SLOT_0__', optionsTurmas)
+        .replace('__TA_SLOT_1__', 'disabled')
+        .replace('__TA_SLOT_2__', '')
+        .replace('__TA_SLOT_3__', document.getElementById('ta-prof-fragment-faltas-aviso').innerHTML);
+
+    container.innerHTML = htmlMain;
+
+    document.getElementById('select-turma-falta')?.addEventListener('change', (e) => {
+        const turmaId = e.target.value;
+        const selDisc = document.getElementById('select-disciplina-falta');
+        if (!turmaId) {
+            selDisc.disabled = true;
+            selDisc.innerHTML = '<option value="">-- Escolha uma Disciplina --</option>';
+            document.getElementById('container-tabela-faltas').innerHTML = document.getElementById('ta-prof-fragment-faltas-aviso').innerHTML;
+            return;
+        }
+
+        selDisc.disabled = false;
+        let optionsDisc = '<option value="">-- Escolha uma Disciplina --</option>';
+        const disciplinasProf = [
+            { id: 'web', nome: 'Desenvolvimento Web & UX' },
+            { id: 'db', nome: 'Banco de Dados' }
+        ];
+        disciplinasProf.forEach(d => {
+            optionsDisc += `<option value="${d.id}">${d.nome}</option>`;
+        });
+        selDisc.innerHTML = optionsDisc;
+    });
+
+    document.getElementById('select-disciplina-falta')?.addEventListener('change', (e) => {
+        const disciplinaId = e.target.value;
+        const containerTabela = document.getElementById('container-tabela-faltas');
+
+        if (!disciplinaId) {
+            containerTabela.innerHTML = document.getElementById('ta-prof-fragment-faltas-aviso').innerHTML;
+            return;
+        }
+
+        carregarTabelaFaltas(disciplinaId, containerTabela);
+    });
+}
+
+function carregarTabelaFaltas(disciplinaId, containerTabela) {
+    const alunosTurma = [
+        { matricula: '2023001', nome: 'Lucas Mendes Santos' },
+        { matricula: '2023002', nome: 'Mariana Oliveira Rocha' },
+        { matricula: '2023003', nome: 'Gabriel Costa Lima' },
+        { matricula: '2023004', nome: 'Beatriz Souza Alves' }
+    ];
+
+    const dadosFaltas = JSON.parse(localStorage.getItem('techacademy_faltas')) || {};
+    const dataHoje = new Date().toISOString().split('T')[0];
+
+    // Carrega a estrutura base da tabela
+    containerTabela.innerHTML = document.getElementById('ta-prof-fragment-faltas-tabela').innerHTML;
+    const tbody = containerTabela.querySelector('tbody');
+
+    let linhasHTML = '';
+    alunosTurma.forEach(aluno => {
+        const regAluno = dadosFaltas[disciplinaId]?.[aluno.matricula] || { total: 0, historico: {} };
+        const statusHoje = regAluno.historico[dataHoje] || 'presente';
+
+        const selPres = statusHoje === 'presente' ? 'selected' : '';
+        const selFalta = statusHoje === 'falta' ? 'selected' : '';
+
+        let linhaTpl = document.getElementById('ta-prof-fragment-faltas-linha').innerHTML
+            .replaceAll('__TA_SLOT_0__', aluno.nome)
+            .replaceAll('__TA_SLOT_1__', aluno.matricula)
+            .replace('__TA_SLOT_2__', selPres)
+            .replace('__TA_SLOT_3__', selFalta)
+            .replace('__TA_SLOT_4__', regAluno.total);
+
+        linhasHTML += linhaTpl;
+    });
+
+    if (tbody) {
+        tbody.innerHTML = linhasHTML;
+    }
+
+    const inputData = document.getElementById('data-chamada-atual');
+    if (inputData) inputData.value = dataHoje;
+
+    document.getElementById('btn-salvar-faltas')?.addEventListener('click', () => {
+        const dataSelecionada = document.getElementById('data-chamada-atual').value;
+        if (!dataSelecionada) {
+            alert('Selecione a data da aula.');
+            return;
+        }
+
+        const selects = document.querySelectorAll('.select-status-falta');
+        let salvos = JSON.parse(localStorage.getItem('techacademy_faltas')) || {};
+        if (!salvos[disciplinaId]) salvos[disciplinaId] = {};
+
+        selects.forEach(sel => {
+            const mat = sel.getAttribute('data-matricula');
+            const status = sel.value;
+
+            if (!salvos[disciplinaId][mat]) {
+                salvos[disciplinaId][mat] = { total: 0, historico: {} };
+            }
+
+            const statusAnterior = salvos[disciplinaId][mat].historico[dataSelecionada] || 'presente';
+            
+            if (statusAnterior !== status) {
+                if (status === 'falta') {
+                    salvos[disciplinaId][mat].total += 1;
+                } else if (statusAnterior === 'falta' && status === 'presente') {
+                    salvos[disciplinaId][mat].total = Math.max(0, salvos[disciplinaId][mat].total - 1);
+                }
+            }
+
+            salvos[disciplinaId][mat].historico[dataSelecionada] = status;
+        });
+
+        localStorage.setItem('techacademy_faltas', JSON.stringify(salvos));
+        alert('Chamada e faltas salvas com sucesso!');
+        carregarTabelaFaltas(disciplinaId, containerTabela);
+    });
 }

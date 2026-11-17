@@ -6,6 +6,24 @@
     <title>TechAcademy - Painel do Aluno</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#070f1e',
+                            navy: '#102a45',
+                            blue: '#2563eb',
+                            light: '#e0f2fe'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -103,9 +121,7 @@
                         </button>
                         <div id="notification-panel" class="hidden absolute right-0 top-12 z-50 w-80 max-w-[85vw] max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl"></div>
                     </div>
-                    <a href="dashboard-professor.html" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition">
-                        <i class="fa-solid fa-repeat mr-1"></i> Ir para Perfil Professor
-                    </a>
+                    
                 </div>
             </header>
 
@@ -150,9 +166,8 @@
     </template>
     <!-- Fragmento ta-aluno-fragment-004: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
     <template id="ta-aluno-fragment-004">
-
-                            <tr class="border-b border-slate-100 hover:bg-slate-50/50 transition">
-                                <td class="p-3 font-semibold text-slate-800">__TA_SLOT_0__</td>
+                            <tr class="boletim-row border-b border-slate-100 hover:bg-slate-50/50 transition">
+                                <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">__TA_SLOT_0__</td>
                                 <td class="p-3 text-slate-600">__TA_SLOT_1__</td>
                                 <td class="p-3 text-slate-600">__TA_SLOT_2__</td>
                                 <td class="p-3 text-slate-600">__TA_SLOT_3__</td>
@@ -164,16 +179,16 @@
                                     </span>
                                 </td>
                             </tr>
-                        
     </template>
     <!-- Fragmento ta-aluno-fragment-003: estrutura HTML reutilizável pela lógica da página. Marcadores __TA_SLOT_n__ recebem valores dinâmicos. -->
     <template id="ta-aluno-fragment-003">
 
-        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm overflow-x-auto">
+        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm">
             <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <i class="fa-solid fa-award text-brand-blue"></i> Meu Boletim Escolar
             </h2>
-            <table class="w-full text-left text-xs">
+            <div class="boletim-table-wrap">
+            <table class="boletim-table w-full min-w-[760px] text-left text-xs border-collapse">
                 <thead>
                     <tr class="bg-blue-50/80 text-slate-600 font-bold uppercase border-b border-blue-100">
                         <th class="p-3">Disciplina</th>
@@ -189,6 +204,7 @@
                     __TA_SLOT_0__
                 </tbody>
             </table>
+            </div>
         </div>
     
     </template>
@@ -337,6 +353,24 @@
     </template>
 
     <!-- Script JS do Aluno -->
+
+    <template id="ta-aluno-fragment-030">
+        <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl border border-blue-100 shadow-sm text-center">
+            <i class="fa-solid fa-clipboard-list text-4xl text-brand-blue mb-4"></i>
+            <h2 class="text-lg font-bold text-slate-800">Nenhuma nota publicada ainda</h2>
+            <p class="text-sm text-slate-500 mt-2">Quando o professor salvar e publicar suas notas, elas aparecerão aqui automaticamente.</p>
+        </div>
+    </template>
+
+    <!-- Alerta de Limite de Faltas (Exibido dinamicamente se faltas >= 15) -->
+<div id="alerta-faltas-critico" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-sm mb-6 flex items-start gap-3">
+    <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl mt-0.5"></i>
+    <div>
+        <h4 class="text-sm font-bold text-red-800">Atenção Crítica: Limite de Faltas Excedido!</h4>
+        <p class="text-xs text-red-700 mt-0.5">Você acumulou 15 ou mais faltas em uma ou mais disciplinas. Procure a secretaria acadêmica ou coordenação para evitar reprovação por falta.</p>
+    </div>
+</div>
+
     <script src="js/app-aluno.js"></script>
 
     <script src="js/mobile-menu.js"></script>
