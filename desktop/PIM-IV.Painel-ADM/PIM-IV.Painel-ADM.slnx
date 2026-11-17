@@ -10,10 +10,21 @@
   <Folder Name="/TechAcademy - API/Src/config/">
     <File Path="../../TechAcademy - API/Src/Config/database.js" />
   </Folder>
-  <Folder Name="/TechAcademy - API/Src/Controllers/" />
-  <Folder Name="/TechAcademy - API/Src/Middlewares/" />
+  <Folder Name="/TechAcademy - API/Src/Controllers/">
+    <File Path="../../TechAcademy - API/Src/Controllers/AlunoController.js" />
+    <File Path="../../TechAcademy - API/Src/Controllers/DisciplinaController.js" />
+    <File Path="../../TechAcademy - API/Src/Controllers/ProfessorController.js" />
+    <File Path="../../TechAcademy - API/Src/Controllers/TurmaController.js" />
+    <File Path="AuthController.js" />
+  </Folder>
+  <Folder Name="/TechAcademy - API/Src/Middlewares/">
+    <File Path="../../TechAcademy - API/Src/middlewares/autenticarToken.js" />
+  </Folder>
   <Folder Name="/TechAcademy - API/Src/Routes/">
     <File Path="../../TechAcademy - API/Src/Routes/index.js" />
+  </Folder>
+  <Folder Name="/TechAcademy - API/Src/Utils/">
+    <File Path="senhaHelper.js" />
   </Folder>
   <Project Path="PIM-IV.Painel-ADM/PIM-IV.Painel-ADM.csproj" />
 </Solution>
