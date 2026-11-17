@@ -1,3 +1,19 @@
 <Solution>
+  <Folder Name="/TechAcademy - API/">
+    <File Path="../../TechAcademy - API/Src/server.js" />
+    <File Path=".gitignore" />
+    <File Path="package-lock.json" />
+    <File Path="package.json" />
+  </Folder>
+  <Folder Name="/TechAcademy - API/Prisma/" />
+  <Folder Name="/TechAcademy - API/Src/" />
+  <Folder Name="/TechAcademy - API/Src/config/">
+    <File Path="../../TechAcademy - API/Src/Config/database.js" />
+  </Folder>
+  <Folder Name="/TechAcademy - API/Src/Controllers/" />
+  <Folder Name="/TechAcademy - API/Src/Middlewares/" />
+  <Folder Name="/TechAcademy - API/Src/Routes/">
+    <File Path="../../TechAcademy - API/Src/Routes/index.js" />
+  </Folder>
   <Project Path="PIM-IV.Painel-ADM/PIM-IV.Painel-ADM.csproj" />
 </Solution>

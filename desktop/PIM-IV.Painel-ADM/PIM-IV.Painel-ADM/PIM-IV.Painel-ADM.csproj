@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="TechAcademy - API\**" />
+    <EmbeddedResource Remove="TechAcademy - API\**" />
+    <None Remove="TechAcademy - API\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
   </ItemGroup>
 

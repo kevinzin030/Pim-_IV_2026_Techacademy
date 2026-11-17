@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 using PIM_IV.Painel_ADM.Forms;
@@ -269,6 +270,14 @@ namespace PIM_IV.Painel_ADM
                     "Disciplinas",
                     "GERENCIAR_DISCIPLINAS",
                     ref posicaoY);
+
+                AdicionarBotaoMenu(
+                    areaRolavel,
+                    "›  Consultar Notas",
+                    posicaoY,
+                    AbrirConsultaNotas);
+
+                posicaoY += EspacamentoMenu;
             }
 
             AdicionarModuloMenu(
@@ -623,6 +632,12 @@ namespace PIM_IV.Painel_ADM
                     "Gerenciamento e vinculação às turmas",
                     "GERENCIAR_DISCIPLINAS",
                     ref indice);
+
+                CriarCartao(
+                    cartoes,
+                    "Consultar Notas",
+                    "Visualização de notas dos alunos",
+                    AbrirConsultaNotas);
             }
 
             AdicionarCartaoModulo(
@@ -838,6 +853,35 @@ namespace PIM_IV.Painel_ADM
             {
                 ExibirErroAberturaModulo(
                     "gerenciamento de turmas",
+                    ex);
+            }
+        }
+
+        // Abre a consulta de notas exclusivamente para o Coordenador.
+        private void AbrirConsultaNotas()
+        {
+            if (_usuario.IdPerfil != PerfilCoordenador)
+            {
+                ExibirMensagemPainel(
+                    "A consulta de notas é exclusiva do Coordenador.",
+                    "Acesso negado",
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            try
+            {
+                FrmConsultarNotas formulario = new();
+
+                ExibirFormularioCentral(formulario);
+
+                lblTituloPagina.Text = "Consultar Notas";
+            }
+            catch (Exception ex)
+            {
+                ExibirErroAberturaModulo(
+                    "consulta de notas",
                     ex);
             }
         }
