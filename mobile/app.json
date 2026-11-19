@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "TechAcademyMobile",
+    "name": "TechAcademy",
     "slug": "TechAcademyMobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,10 +15,17 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.maxoliver.techacademy"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a3689553-3b54-470c-88d1-4b205bf83160"
+      }
+    },
+    "owner": "max.oliver"
   }
 }

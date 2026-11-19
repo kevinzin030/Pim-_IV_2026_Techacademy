@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import {
   View,
+  Image,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,7 +18,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 // Endereço da API Node.js acessível pelo emulador Android.
-const ENDERECO_API = 'http://10.0.2.2:3000/api';
+const ENDERECO_API = 'https://techacademy-api-2026-h0ebgpcgechch0c4.brazilsouth-01.azurewebsites.net/api';
 
 // Perfis autorizados a utilizar o TechAcademy Mobile.
 const PERFIL_PROFESSOR = 3;
@@ -1348,11 +1349,7 @@ export default function App() {
 
         <View style={estilos.barraSuperior}>
           <View style={estilos.identidadeAplicativo}>
-            <View style={estilos.logotipoPequeno}>
-              <Text style={estilos.letraLogotipoPequeno}>
-                T
-              </Text>
-            </View>
+            <Image source={require("./assets/simbolo-t-branco.png")} style={{ width: 36, height: 36, borderRadius: 9 }} resizeMode="contain" />
 
             <View>
               <Text style={estilos.marcaAplicativo}>
@@ -1429,11 +1426,7 @@ export default function App() {
                     </Text>
                   </View>
 
-                  <View style={estilos.iconeDestaque}>
-                    <Text style={estilos.textoIconeDestaque}>
-                      T
-                    </Text>
-                  </View>
+                  <Image source={require("./assets/simbolo-t-branco.png")} style={{ width: 48, height: 48, borderRadius: 12 }} resizeMode="contain" />
                 </View>
 
                 <View style={estilos.identificacaoDestaque}>
@@ -2396,11 +2389,7 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         <View style={estilos.cabecalhoLogin}>
-          <View style={estilos.logotipoLogin}>
-            <Text style={estilos.letraLogotipo}>
-              T
-            </Text>
-          </View>
+          <Image source={require("./assets/simbolo-t-branco.png")} style={{ width: 64, height: 64, borderRadius: 16 }} resizeMode="contain" />
 
           <Text style={estilos.nomeAplicativo}>
             TechAcademy
