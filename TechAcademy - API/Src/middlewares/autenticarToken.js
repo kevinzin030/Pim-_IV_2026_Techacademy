@@ -121,6 +121,22 @@ export async function autenticarToken(req, res, next) {
             deveAlterarSenha: Boolean(usuario.DeveAlterarSenha)
         };
 
+        // Permite a troca de senha mesmo quando ela é obrigatória.
+        const rotaAlteracaoSenha =
+            req.baseUrl + req.path === "/api/auth/alterar-senha";
+
+        // Impede consultas enquanto houver troca obrigatória pendente.
+        if (
+            req.usuario.deveAlterarSenha &&
+            !rotaAlteracaoSenha
+        ) {
+            return res.status(403).json({
+                mensagem: "É necessário alterar sua senha antes de acessar o sistema.",
+                codigo: "ALTERACAO_SENHA_OBRIGATORIA",
+                deveAlterarSenha: true
+            });
+        }
+
         // Permite que a requisição continue.
         return next();
 
