@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>TechAcademy - Autenticação</title>
+
+    <!-- Ícone oficial da aba do navegador -->
+    <link rel="icon"
+          type="image/png"
+          href="assets/favicon.png">
+
+    <!-- Biblioteca de estilização Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Configuração da identidade visual -->
+    <script>
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                brand: {
+                                    dark: '#070f1e',
+                                    navy: '#102a45',
+                                    blue: '#2563eb',
+                                    light: '#e0f2fe'
+                                }
+                            }
+                        }
+                    }
+                };
+    </script>
+
+    <!-- Biblioteca de ícones Font Awesome -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonte utilizada na interface -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+
+    <!-- Estilos personalizados do sistema -->
+    <link rel="stylesheet" href="css/styles.css">
+
+</head>
+
+<body class="bg-brand-dark min-h-screen flex items-center
+             justify-center p-4 relative overflow-x-hidden
+             font-sans">
+
+    <!-- Área de mensagens e notificações temporárias -->
+    <div id="toast-container"
+         class="fixed top-5 right-5 z-50 flex flex-col
+                gap-2 max-w-md">
+    </div>
+
+    <!-- Elementos decorativos do fundo -->
+    <div class="absolute -top-24 -left-24 w-72 h-72
+                sm:w-96 sm:h-96 bg-brand-blue/20
+                rounded-full blur-3xl pointer-events-none"
+         aria-hidden="true">
+    </div>
+
+    <div class="absolute -bottom-24 -right-24 w-72 h-72
+                sm:w-96 sm:h-96 bg-blue-400/10
+                rounded-full blur-3xl pointer-events-none"
+         aria-hidden="true">
+    </div>
+
+    <!-- Conteúdo principal da autenticação -->
+    <main class="w-full max-w-md mx-auto relative z-10 my-auto
+                 !bg-transparent !bg-none">
+
+        <!-- Cartão de autenticação -->
+        <section class="bg-white rounded-2xl shadow-2xl
+                        p-6 sm:p-8 border border-slate-100
+                        w-full">
+
+            <!-- Identificação visual do TechAcademy -->
+            <header class="text-center mb-6 sm:mb-8">
+
+                <!-- Logo oficial com fundo transparente -->
+                <img src="assets/logo-t-transparente.png"
+                     alt="Logo TechAcademy"
+                     class="block w-16 h-16 sm:w-20 sm:h-20
+                            mx-auto mb-3 sm:mb-4
+                            object-contain bg-transparent
+                            border-0 shadow-none rounded-none
+                            brightness-0">
+
+                <h1 class="text-xl sm:text-2xl font-bold
+                           text-brand-dark">
+
+                    TechAcademy
+
+                </h1>
+
+                <p class="text-xs sm:text-sm text-slate-500 mt-1">
+
+                    Plataforma Acadêmica Inteligente
+
+                </p>
+
+            </header>
+
+            <!-- Seleção do perfil de acesso -->
+            <div class="bg-slate-100 p-1 rounded-xl flex mb-6">
+
+                <!-- Perfil do professor -->
+                <button type="button"
+                        id="role-btn-professor"
+                        class="flex-1 py-2 text-xs font-semibold
+                               rounded-lg transition-all shadow-sm
+                               bg-white text-brand-dark cursor-pointer">
+
+                    <i class="fa-solid fa-chalkboard-user mr-1"
+                       aria-hidden="true"></i>
+
+                    Professor (RP)
+
+                </button>
+
+                <!-- Perfil do aluno -->
+                <button type="button"
+                        id="role-btn-aluno"
+                        class="flex-1 py-2 text-xs font-semibold
+                               rounded-lg text-slate-500
+                               hover:text-brand-dark transition-all
+                               cursor-pointer">
+
+                    <i class="fa-solid fa-user-graduate mr-1"
+                       aria-hidden="true"></i>
+
+                    Aluno (RA)
+
+                </button>
+
+            </div>
+
+            <!-- Formulário de autenticação -->
+            <form id="login-form" class="space-y-4">
+
+                <!-- Identificador acadêmico do usuário -->
+                <div>
+
+                    <label id="login-label"
+                           for="login-identifier"
+                           class="block text-xs font-semibold
+                                  text-slate-600 uppercase
+                                  tracking-wider mb-2">
+
+                        RP (Registro de Professor)
+
+                    </label>
+
+                    <div class="relative">
+
+                        <i id="login-icon"
+                           class="fa-solid fa-id-card absolute
+                                  left-3.5 top-3.5 text-slate-400
+                                  text-sm"
+                           aria-hidden="true"></i>
+
+                        <input type="text"
+                               id="login-identifier"
+                               autocomplete="username"
+                               required
+                               placeholder="Digite seu RP"
+                               class="w-full pl-10 pr-4 py-2.5
+                                      rounded-xl border border-slate-200
+                                      focus:outline-none
+                                      focus:border-brand-blue
+                                      focus:ring-2
+                                      focus:ring-brand-blue/20
+                                      text-sm transition">
+
+                    </div>
+
+                </div>
+
+                <!-- Senha de acesso -->
+                <div>
+
+                    <label for="login-password"
+                           class="block text-xs font-semibold
+                                  text-slate-600 uppercase
+                                  tracking-wider mb-2">
+
+                        Senha
+
+                    </label>
+
+                    <div class="relative">
+
+                        <i class="fa-solid fa-lock absolute
+                                  left-3.5 top-3.5 text-slate-400
+                                  text-sm"
+                           aria-hidden="true"></i>
+
+                        <input type="password"
+                               id="login-password"
+                               autocomplete="current-password"
+                               required
+                               placeholder="••••••••"
+                               class="w-full pl-10 pr-4 py-2.5
+                                      rounded-xl border border-slate-200
+                                      focus:outline-none
+                                      focus:border-brand-blue
+                                      focus:ring-2
+                                      focus:ring-brand-blue/20
+                                      text-sm transition">
+
+                    </div>
+
+                </div>
+
+                <!-- Opções auxiliares de autenticação -->
+                <div class="flex items-center justify-between
+                            text-xs text-slate-500">
+
+                    <!-- Preferência de acesso -->
+                    <label class="flex items-center gap-2
+                                  cursor-pointer">
+
+                        <input type="checkbox"
+                               checked
+                               class="rounded border-slate-300
+                                      text-brand-blue
+                                      focus:ring-brand-blue">
+
+                        <span>Lembrar-me</span>
+
+                    </label>
+
+                    <!-- Solicitação de recuperação de senha -->
+                    <a href="#"
+                       id="forgot-password"
+                       class="text-brand-blue hover:underline">
+
+                        Esqueceu a senha?
+
+                    </a>
+
+                </div>
+
+                <!-- Envio das credenciais para autenticação -->
+                <button type="submit"
+                        class="w-full py-3.5 bg-brand-blue
+                               hover:bg-brand-navy text-white
+                               font-bold rounded-xl transition
+                               shadow-lg hover:shadow-xl flex
+                               items-center justify-center gap-2
+                               text-sm sm:text-base cursor-pointer">
+
+                    <span>Entrar na Plataforma</span>
+
+                    <i class="fa-solid fa-arrow-right text-sm"
+                       aria-hidden="true"></i>
+
+                </button>
+
+            </form>
+
+        </section>
+
+    </main>
+
+    <!-- Integração da autenticação com a API TechAcademy -->
+    <script src="js/login.js"></script>
+
+</body>
+
+</html>

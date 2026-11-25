@@ -1,0 +1,491 @@
+/* Importação da fonte utilizada na interface */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Variáveis da identidade visual do TechAcademy */
+:root {
+    --brand-dark: #070f1e;
+    --brand-navy: #102a45;
+    --brand-blue: #2563eb;
+    --brand-light: #e0f2fe;
+}
+
+/* Estilização global das páginas */
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient( 135deg, #070f1e 0%, #0f2038 50%, #091728 100% );
+    background-attachment: fixed;
+    color: #1e293b;
+}
+
+/* Área principal dos painéis acadêmicos */
+main {
+    background-color: #f0f7ff !important;
+    background-image: radial-gradient( at 0% 0%, rgba(37, 99, 235, 0.08) 0px, transparent 50% ), radial-gradient( at 100% 100%, rgba(16, 42, 69, 0.08) 0px, transparent 50% ) !important;
+}
+
+/* Cartões com fundo branco e sombra suave */
+.bg-white {
+    background-color: #ffffff !important;
+    box-shadow: 0 4px 20px -2px rgba(37, 99, 235, 0.08);
+}
+
+/* Dimensões da barra de rolagem personalizada */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+/* Fundo da barra de rolagem */
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(10, 25, 47, 0.5);
+}
+
+/* Indicador da posição de rolagem */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #1e3a8a;
+    border-radius: 6px;
+}
+
+    /* Realce da barra de rolagem ao passar o mouse */
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: var(--brand-blue);
+    }
+
+/* Animação utilizada pelos indicadores de gamificação */
+@keyframes flame {
+    0%, 100% {
+        transform: scale(1) rotate(-3deg);
+    }
+
+    50% {
+        transform: scale(1.18) rotate(3deg);
+    }
+}
+
+/* Aplicação da animação de gamificação */
+.flame-animation {
+    display: inline-block;
+    animation: flame 1.5s infinite ease-in-out;
+}
+
+/* Botão de abertura do menu em dispositivos móveis */
+.mobile-menu-toggle {
+    display: none;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #dbe3ee;
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--brand-navy);
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(15, 42, 69, 0.08);
+}
+
+/* Organização do título e subtítulo das páginas */
+.header-page-heading {
+    min-width: 0;
+    flex: 1;
+}
+
+/* Fundo do menu lateral, inicialmente oculto */
+.mobile-menu-backdrop {
+    display: none;
+}
+
+/* Adaptação da interface para dispositivos móveis */
+@media (max-width: 767px) {
+
+    /* Impede a rolagem da página com o menu aberto */
+    body.mobile-menu-lock {
+        overflow: hidden;
+    }
+
+    /* Exibe o botão do menu em telas menores */
+    .mobile-menu-toggle {
+        display: inline-flex;
+    }
+
+    /* Posiciona o menu lateral sobre o conteúdo */
+    #sidebar {
+        position: fixed !important;
+        inset: 0 auto 0 0;
+        width: min(86vw, 320px) !important;
+        height: 100dvh;
+        z-index: 60;
+        overflow-y: auto;
+        background-color: var(--brand-dark) !important;
+        transform: translateX(-105%);
+        transition: transform 0.25s ease;
+        box-shadow: 12px 0 36px rgba(2, 8, 23, 0.4);
+    }
+
+        /* Exibe o menu lateral quando solicitado */
+        #sidebar.mobile-menu-open {
+            transform: translateX(0);
+        }
+
+    /* Camada escura posicionada atrás do menu */
+    .mobile-menu-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: rgba(2, 8, 23, 0.7);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+    }
+
+        /* Ativa a camada de fundo do menu */
+        .mobile-menu-backdrop.mobile-menu-backdrop-visible {
+            display: block;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+    /* Ajusta a largura do conteúdo principal */
+    main {
+        width: 100%;
+        min-width: 0;
+    }
+
+        /* Reduz o espaçamento interno do cabeçalho */
+        main > header {
+            gap: 10px !important;
+        }
+
+    /* Ajusta o título da página */
+    .header-page-heading h1 {
+        font-size: 1rem;
+        line-height: 1.3;
+    }
+
+    /* Ajusta o subtítulo da página */
+    .header-page-heading p {
+        font-size: 0.7rem;
+        line-height: 1.35;
+    }
+
+    /* Reduz as margens internas do conteúdo */
+    #main-content-area {
+        padding: 1rem !important;
+    }
+}
+
+/* Botão de acesso à central de notificações */
+.notification-bell-button {
+    width: 42px;
+    height: 42px;
+    color: #1e293b;
+    cursor: pointer;
+}
+
+    /* Indicador de foco para navegação pelo teclado */
+    .notification-bell-button:focus-visible,
+    .mobile-menu-toggle:focus-visible {
+        outline: 3px solid #60a5fa;
+        outline-offset: 2px;
+    }
+
+/* Botão de acesso aos questionários acadêmicos */
+.quiz-access-button {
+    background-color: var(--brand-blue);
+    color: #ffffff;
+    min-width: 130px;
+    cursor: pointer;
+    transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+    /* Realce do botão de questionários */
+    .quiz-access-button:hover {
+        background-color: #1d4ed8;
+    }
+
+/* Sombra do botão de resolução de questionários */
+.quiz-access-button--play {
+    box-shadow: 0 2px 5px rgba(37, 99, 235, 0.25);
+}
+
+/* Altura da área de visualização de documentos PDF */
+.pdf-preview-frame {
+    height: 480px;
+}
+
+/* Ação de marcar uma notificação como lida */
+.notification-mark-read {
+    color: var(--brand-blue);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Botão de cancelamento de edição */
+.button-cancel-edit {
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Botão de publicação de aulas e materiais */
+.button-post-lesson {
+    display: block;
+    width: 100%;
+    background: var(--brand-blue);
+    color: #ffffff;
+    padding: 12px;
+    border: 0;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+}
+
+/* Estrutura das barras de progresso e métricas */
+.progress-fill {
+    width: var(--progress-width, 0%);
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.35s ease;
+}
+
+/* Indicador de alunos aprovados */
+.progress-fill--approved {
+    background-color: #10b981;
+}
+
+/* Indicador de alunos em exame */
+.progress-fill--exam {
+    background-color: #fbbf24;
+}
+
+/* Indicador de alunos reprovados */
+.progress-fill--failed {
+    background-color: #ef4444;
+}
+
+/* Classes de fundo da identidade visual */
+.bg-brand-blue {
+    background-color: var(--brand-blue) !important;
+}
+
+.bg-brand-navy {
+    background-color: var(--brand-navy) !important;
+}
+
+.bg-brand-dark {
+    background-color: var(--brand-dark) !important;
+}
+
+.bg-brand-light {
+    background-color: var(--brand-light) !important;
+}
+
+/* Variações de fundo para interação com o mouse */
+.hover\:bg-brand-dark:hover {
+    background-color: var(--brand-dark) !important;
+}
+
+.hover\:bg-brand-blue:hover {
+    background-color: var(--brand-blue) !important;
+}
+
+.hover\:bg-brand-navy:hover {
+    background-color: var(--brand-navy) !important;
+}
+
+/* Classes de texto da identidade visual */
+.text-brand-blue {
+    color: var(--brand-blue) !important;
+}
+
+.text-brand-dark {
+    color: var(--brand-dark) !important;
+}
+
+.text-brand-navy {
+    color: var(--brand-navy) !important;
+}
+
+/* Classe de borda da identidade visual */
+.border-brand-blue {
+    border-color: var(--brand-blue) !important;
+}
+
+/* Container responsivo da tabela do boletim escolar */
+.boletim-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+/* Estrutura principal da tabela de notas */
+.boletim-table {
+    width: 100%;
+    min-width: 850px;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+}
+
+    /* Padronização das células e dos cabeçalhos */
+    .boletim-table th,
+    .boletim-table td {
+        box-sizing: border-box;
+        padding: 14px 12px;
+        vertical-align: middle;
+        text-align: center;
+        line-height: 1.4;
+    }
+
+    /* Identificação das colunas do boletim */
+    .boletim-table th {
+        background: #eff6ff;
+        color: #475569;
+        font-size: 10px;
+        letter-spacing: 0.035em;
+        font-weight: 800;
+        text-transform: uppercase;
+        white-space: nowrap;
+        border-bottom: 1px solid #dbeafe;
+    }
+
+        /* Coluna de identificação da disciplina */
+        .boletim-table th:first-child,
+        .boletim-table td:first-child {
+            width: 31%;
+            text-align: left;
+        }
+
+        /* Colunas das avaliações P1 e P2 */
+        .boletim-table th:nth-child(2),
+        .boletim-table th:nth-child(3) {
+            width: 10%;
+        }
+
+        /* Coluna da nota do trabalho */
+        .boletim-table th:nth-child(4) {
+            width: 14%;
+        }
+
+        /* Coluna da nota dos questionários */
+        .boletim-table th:nth-child(5) {
+            width: 13%;
+        }
+
+        /* Coluna da média final */
+        .boletim-table th:nth-child(6) {
+            width: 9%;
+        }
+
+        /* Coluna da situação acadêmica */
+        .boletim-table th:nth-child(7) {
+            width: 13%;
+        }
+
+    /* Estilização dos registros acadêmicos */
+    .boletim-table .boletim-row td {
+        color: #475569;
+        background: #ffffff;
+        border-bottom: 1px solid #edf2f7;
+        white-space: nowrap;
+    }
+
+    /* Realce da linha selecionada pelo mouse */
+    .boletim-table .boletim-row:hover td {
+        background: #f8fbff;
+    }
+
+    /* Remove a borda inferior do último registro */
+    .boletim-table .boletim-row:last-child td {
+        border-bottom: 0;
+    }
+
+    /* Destaque do nome da disciplina */
+    .boletim-table .disciplina-cell {
+        color: #1e293b;
+        font-weight: 700;
+        white-space: normal;
+        min-width: 220px;
+    }
+
+    /* Destaque da média final do aluno */
+    .boletim-table .media-cell {
+        color: #1d4ed8;
+        font-weight: 800;
+    }
+
+    /* Destaque da situação acadêmica */
+    .boletim-table .situacao-cell {
+        font-weight: 700;
+    }
+
+    /* Situação acadêmica: aprovado */
+    .boletim-table .status-aprovado {
+        color: #047857;
+    }
+
+    /* Situação acadêmica: exame */
+    .boletim-table .status-exame {
+        color: #b45309;
+    }
+
+    /* Situação acadêmica: reprovado */
+    .boletim-table .status-reprovado {
+        color: #b91c1c;
+    }
+
+/* Responsividade do boletim em dispositivos móveis */
+@media (max-width: 767px) {
+
+    /* Remove margens laterais desnecessárias */
+    .boletim-table-wrap {
+        margin-inline: 0;
+    }
+
+    /* Preserva a legibilidade com rolagem horizontal */
+    .boletim-table {
+        min-width: 850px;
+    }
+}
+/* Identidade visual da logo TechAcademy */
+.techacademy-logo {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Logo da tela de autenticação */
+.techacademy-logo--login {
+    display: inline-block;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 12px;
+    filter: brightness(0) saturate(100%) invert(12%) sepia(25%) saturate(1800%);
+}
+
+/* Logo dos painéis do aluno e do professor */
+.techacademy-logo--sidebar {
+    display: block;
+    width: 44px;
+    height: 44px;
+}
+
+/* Responsividade da logo */
+@media (max-width: 767px) {
+    .techacademy-logo--login {
+        width: 64px;
+        height: 64px;
+    }
+}

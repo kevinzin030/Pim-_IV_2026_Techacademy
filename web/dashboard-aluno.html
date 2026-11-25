@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>TechAcademy - Painel do Aluno</title>
+
+    <!-- Ícone da aba do navegador -->
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+
+    <!-- Biblioteca de estilização Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Configuração da identidade visual do TechAcademy -->
+    <script>
+                                        window.tailwind.config = {
+                                            theme: {
+                                                extend: {
+                                                    colors: {
+                                                        brand: {
+                                                            dark: '#070f1e',
+                                                            navy: '#102a45',
+                                                            blue: '#2563eb',
+                                                            light: '#e0f2fe'
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        };
+    </script>
+
+    <!-- Biblioteca de ícones -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonte utilizada na interface -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet">
+
+    <!-- Estilos personalizados do sistema -->
+    <link rel="stylesheet" href="css/styles.css">
+
+    <style>
+        /* Oculta os cartões ao acessar uma disciplina. */
+        #main-content-area:has(#detalhes-disciplina-container:not(:empty)) #lista-disciplinas-cards,
+        #main-content-area:has(#detalhes-disciplina-container:not(:empty)) p:has(+ #lista-disciplinas-cards) {
+            display: none;
+        }
+
+        /* Remove o espaçamento superior dos detalhes. */
+        #detalhes-disciplina-container:not(:empty),
+        #detalhes-disciplina-container > div {
+            margin-top: 0;
+        }
+
+        /* Controla a rolagem do painel em computadores. */
+        @media (min-width: 1024px) {
+            html,
+            body {
+                height: 100%;
+                overflow: hidden;
+            }
+
+                /* Limita a estrutura principal à altura da tela. */
+                body > div:has(> #sidebar) {
+                    height: 100dvh;
+                    min-height: 0;
+                    overflow: hidden;
+                }
+
+            /* Mantém a barra lateral sempre visível. */
+            #sidebar {
+                height: 100%;
+                min-height: 0;
+                flex-shrink: 0;
+                overflow: hidden;
+            }
+
+                /* Preserva a identificação e os indicadores. */
+                #sidebar > div,
+                #sidebar > section {
+                    flex-shrink: 0;
+                }
+
+                /* Permite rolagem interna do menu, se necessário. */
+                #sidebar > nav {
+                    flex: 1;
+                    min-height: 0;
+                    overflow-y: auto;
+                }
+
+                /* Mantém o perfil e o botão de sair no rodapé. */
+                #sidebar > div:last-child {
+                    margin-top: auto;
+                    flex-shrink: 0;
+                }
+
+            /* Organiza a área principal do painel. */
+            main:has(> #main-content-area) {
+                height: 100%;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+                /* Mantém o cabeçalho sempre visível. */
+                main:has(> #main-content-area) > header {
+                    flex-shrink: 0;
+                }
+
+            /* Permite rolagem somente no conteúdo principal. */
+            #main-content-area {
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased bg-slate-50
+             min-h-screen flex flex-col font-sans">
+
+    <!-- Área de mensagens e notificações temporárias -->
+    <div id="toast-container"
+         class="fixed top-5 right-5 z-50 flex flex-col
+                gap-2 max-w-md">
+    </div>
+
+    <!-- Estrutura principal do painel acadêmico -->
+    <div class="min-h-screen flex flex-col md:flex-row">
+
+        <!-- Fundo utilizado pelo menu em dispositivos móveis -->
+        <div id="mobile-menu-backdrop"
+             class="mobile-menu-backdrop"
+             aria-hidden="true">
+        </div>
+
+        <!-- Menu lateral do aluno -->
+        <aside id="sidebar"
+               class="w-full md:w-64 bg-brand-dark text-white
+                      flex-shrink-0 flex flex-col border-r
+                      border-slate-800">
+
+            <!-- Identificação visual do sistema -->
+            <div class="p-5 flex items-center justify-between
+                        border-b border-slate-800">
+
+                <div class="flex items-center gap-3">
+                    <!-- Logo oficial do TechAcademy -->
+                    <img src="assets/logo-t-transparente.png"
+                         alt="Logo TechAcademy"
+                         class="techacademy-logo techacademy-logo--sidebar">
+
+                    <div>
+                        <h2 class="font-bold text-base
+                                   tracking-wide text-white">
+                            TechAcademy
+                        </h2>
+
+                        <span class="text-[10px] px-2 py-0.5
+                                     rounded-full bg-emerald-900/60
+                                     text-emerald-300 border
+                                     border-emerald-700 font-medium">
+                            Aluno
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Indicadores de gamificação do aluno -->
+            <section class="p-4 mx-3 my-3 bg-slate-800/80
+                            rounded-xl border border-slate-700/60">
+
+                <div class="text-xs font-semibold text-slate-400
+                            uppercase tracking-wider mb-2
+                            flex justify-between items-center">
+
+                    <span>Meu Progresso</span>
+
+                    <i class="fa-solid fa-trophy text-amber-400"></i>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+
+                    <!-- XP acumulado, consultado pela API -->
+                    <div class="bg-slate-900/60 p-2.5 rounded-lg
+                                border border-slate-800 text-center">
+
+                        <div class="text-[10px] text-slate-400">
+                            XP Acumulado
+                        </div>
+
+                        <div id="widget-xp"
+                             class="text-lg font-extrabold
+                                    text-amber-400 flex items-center
+                                    justify-center gap-1">
+
+                            <span>0</span>
+
+                            <span class="text-[10px] uppercase">
+                                XP
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Nível atual, atualizado pela integração -->
+                    <div class="bg-slate-900/60 p-2.5 rounded-lg
+                                border border-slate-800 text-center">
+
+                        <div class="text-[10px] text-slate-400">
+                            Nível Atual
+                        </div>
+
+                        <div id="widget-streak"
+                             class="text-lg font-extrabold
+                                    text-blue-400 flex items-center
+                                    justify-center gap-1">
+
+                            <i class="fa-solid fa-star"></i>
+
+                            <span id="streak-count">1</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- A barra de progresso é criada pelo JavaScript -->
+
+            </section>
+
+            <!-- Navegação entre as funcionalidades do aluno -->
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto
+                        custom-scrollbar"
+                 aria-label="Menu do estudante">
+
+                <div class="text-[11px] font-semibold
+                            text-slate-400 uppercase
+                            px-3 pt-2 pb-1">
+
+                    Menu do Estudante
+                </div>
+
+                <!-- Disciplinas e materiais acadêmicos -->
+                <button id="nav-disciplinas"
+                        type="button"
+                        class="w-full flex items-center gap-3
+                               px-3 py-2.5 rounded-xl text-sm
+                               font-medium transition-all
+                               bg-brand-blue text-white shadow-md">
+
+                    <i class="fa-solid fa-book-open w-5 text-center"></i>
+
+                    <span>Disciplinas &amp; Aulas</span>
+                </button>
+
+                <!-- Listagem geral de questionários -->
+                <button id="nav-quizzes"
+                        type="button"
+                        class="w-full flex items-center gap-3
+                               px-3 py-2.5 rounded-xl text-sm
+                               font-medium transition-all
+                               text-slate-300 hover:bg-slate-800
+                               hover:text-white">
+
+                    <i class="fa-solid fa-gamepad w-5 text-center"></i>
+
+                    <span>Questionários</span>
+                </button>
+
+                <!-- Consulta das notas acadêmicas -->
+                <button id="nav-boletim"
+                        type="button"
+                        class="w-full flex items-center gap-3
+                               px-3 py-2.5 rounded-xl text-sm
+                               font-medium transition-all
+                               text-slate-300 hover:bg-slate-800
+                               hover:text-white">
+
+                    <i class="fa-solid fa-award w-5 text-center"></i>
+
+                    <span>Meu Boletim / Notas</span>
+                </button>
+
+                <!-- Informações pessoais do aluno -->
+                <button id="nav-perfil"
+                        type="button"
+                        class="w-full flex items-center gap-3
+                               px-3 py-2.5 rounded-xl text-sm
+                               font-medium transition-all
+                               text-slate-300 hover:bg-slate-800
+                               hover:text-white">
+
+                    <i class="fa-solid fa-user-pen w-5 text-center"></i>
+
+                    <span>Meu Perfil</span>
+                </button>
+
+            </nav>
+
+            <!-- Identificação do usuário autenticado -->
+            <div class="p-4 border-t border-slate-800
+                        bg-slate-900/50 flex items-center
+                        justify-between">
+
+                <div class="flex items-center gap-3 overflow-hidden">
+
+                    <div class="w-9 h-9 rounded-full bg-emerald-600
+                                text-white flex items-center
+                                justify-center font-bold text-sm
+                                flex-shrink-0">
+                        AL
+                    </div>
+
+                    <div class="truncate">
+
+                        <div id="aluno-name-sidebar"
+                             class="text-sm font-medium
+                                    text-white truncate">
+                            Carregando...
+                        </div>
+
+                        <div id="aluno-email-sidebar"
+                             class="text-xs text-slate-400 truncate">
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Encerramento da sessão -->
+                <a href="index.html"
+                   title="Sair da conta"
+                   aria-label="Sair da conta"
+                   class="text-slate-400 hover:text-red-400
+                          p-2 transition">
+
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+
+            </div>
+        </aside>
+
+        <!-- Conteúdo principal do painel -->
+        <main class="flex-1 flex flex-col min-w-0
+                     bg-slate-50 overflow-y-auto">
+
+            <!-- Cabeçalho da página atual -->
+            <header class="bg-white border-b border-slate-200
+                           px-4 sm:px-6 py-4 flex flex-row
+                           items-center justify-between gap-3
+                           sticky top-0 z-30 shadow-sm">
+
+                <!-- Controle do menu em dispositivos móveis -->
+                <button id="mobile-menu-toggle"
+                        type="button"
+                        class="mobile-menu-toggle"
+                        aria-label="Abrir menu de navegação"
+                        aria-expanded="false"
+                        aria-controls="sidebar">
+
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+
+                <!-- Título e descrição da funcionalidade atual -->
+                <div class="header-page-heading">
+
+                    <h1 id="page-title"
+                        class="text-xl font-bold text-slate-800">
+
+                        Disciplinas &amp; Aulas
+                    </h1>
+
+                    <p id="page-subtitle"
+                       class="text-xs text-slate-500">
+
+                        Acesse seus cursos, faça questionários
+                        e acompanhe seu progresso.
+                    </p>
+                </div>
+
+                <!-- Central de notificações -->
+                <div class="flex items-center gap-3">
+
+                    <div class="relative">
+
+                        <button id="notification-bell"
+                                type="button"
+                                aria-label="Abrir notificações"
+                                class="notification-bell-button
+                                       relative flex items-center
+                                       justify-center rounded-xl
+                                       border border-slate-200
+                                       bg-white hover:bg-blue-50">
+
+                            <i class="fa-solid fa-bell text-lg"></i>
+
+                            <span id="notification-count"
+                                  class="hidden absolute -right-1
+                                         -top-1 rounded-full
+                                         bg-red-600 px-1.5 py-0.5
+                                         text-[10px] font-bold
+                                         text-white">
+                                0
+                            </span>
+                        </button>
+
+                        <div id="notification-panel"
+                             class="hidden absolute right-0 top-12
+                                    z-50 w-80 max-w-[85vw]
+                                    max-h-96 overflow-y-auto
+                                    rounded-xl border border-slate-200
+                                    bg-white p-3 shadow-xl">
+                        </div>
+
+                    </div>
+                </div>
+
+            </header>
+
+            <!-- Área preenchida dinamicamente pelo JavaScript -->
+            <div id="main-content-area"
+                 class="p-6 flex-1 max-w-7xl w-full mx-auto">
+            </div>
+
+        </main>
+    </div>
+
+    <!--
+        Templates reutilizáveis da interface.
+
+        Os marcadores __TA_SLOT_n__ são substituídos
+        pelo JavaScript durante a renderização.
+
+        Os identificadores devem ser preservados,
+        pois são utilizados pelas integrações existentes.
+    -->
+    <!-- Fragmento 001: mensagem de sucesso -->
+    <template id="ta-aluno-fragment-001">
+
+        <i class="fa-solid fa-circle-check
+                  text-emerald-400 text-sm">
+        </i>
+
+        <span>__TA_SLOT_0__</span>
+
+    </template>
+
+    <!-- Fragmento 002: formulário de perfil do estudante -->
+    <template id="ta-aluno-fragment-002">
+
+        <section class="max-w-md mx-auto bg-white p-6
+                        rounded-2xl border border-blue-100
+                        shadow-sm text-xs">
+
+            <h2 class="text-base font-bold text-slate-800
+                       mb-4 flex items-center gap-2">
+
+                <i class="fa-solid fa-user-pen text-brand-blue"></i>
+
+                Perfil do Estudante
+            </h2>
+
+            <form id="form-perfil-aluno" class="space-y-4">
+
+                <div>
+                    <label for="aluno-nome"
+                           class="block font-bold text-slate-700 mb-1">
+
+                        Nome Completo
+                    </label>
+
+                    <input type="text"
+                           id="aluno-nome"
+                           value="__TA_SLOT_0__"
+                           required
+                           class="w-full p-2.5 border
+                                  border-slate-200 rounded-xl
+                                  focus:border-brand-blue
+                                  focus:outline-none">
+                </div>
+
+                <div>
+                    <label for="aluno-email"
+                           class="block font-bold text-slate-700 mb-1">
+
+                        E-mail
+                    </label>
+
+                    <input type="email"
+                           id="aluno-email"
+                           value="__TA_SLOT_1__"
+                           required
+                           class="w-full p-2.5 border
+                                  border-slate-200 rounded-xl
+                                  focus:border-brand-blue
+                                  focus:outline-none">
+                </div>
+
+                <div>
+                    <label for="aluno-curso"
+                           class="block font-bold text-slate-700 mb-1">
+
+                        Curso
+                    </label>
+
+                    <input type="text"
+                           id="aluno-curso"
+                           value="__TA_SLOT_2__"
+                           disabled
+                           class="w-full p-2.5 bg-slate-100
+                                  border border-slate-200
+                                  rounded-xl text-slate-500">
+                </div>
+
+                <button type="submit"
+                        class="w-full py-2.5 bg-brand-blue
+                               hover:bg-brand-navy text-white
+                               font-bold rounded-xl transition
+                               shadow-sm">
+
+                    Salvar Dados
+                </button>
+
+            </form>
+        </section>
+
+    </template>
+
+    <!-- Fragmento 003: estrutura do boletim escolar -->
+    <template id="ta-aluno-fragment-003">
+
+        <section class="bg-white p-6 rounded-2xl
+                        border border-blue-100 shadow-sm">
+
+            <h2 class="text-base font-bold text-slate-800
+                       mb-4 flex items-center gap-2">
+
+                <i class="fa-solid fa-award text-brand-blue"></i>
+
+                Meu Boletim Escolar
+            </h2>
+
+            <div class="boletim-table-wrap">
+
+                <table class="boletim-table w-full min-w-[760px]
+                              text-left text-xs border-collapse">
+
+                    <thead>
+                        <tr class="bg-blue-50/80 text-slate-600
+                                   font-bold uppercase
+                                   border-b border-blue-100">
+
+                            <th scope="col" class="p-3">
+                                Disciplina
+                            </th>
+
+                            <th scope="col" class="p-3">
+                                P1 (30%)
+                            </th>
+
+                            <th scope="col" class="p-3">
+                                P2 (30%)
+                            </th>
+
+                            <th scope="col" class="p-3">
+                                Trabalho (25%)
+                            </th>
+
+                            <th scope="col" class="p-3">
+                                Quizzes (15%)
+                            </th>
+
+                            <th scope="col" class="p-3">
+                                Média
+                            </th>
+
+                            <th scope="col" class="p-3">
+                                Situação
+                            </th>
+
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        __TA_SLOT_0__
+                    </tbody>
+
+                </table>
+            </div>
+
+        </section>
+
+    </template>
+
+    <!-- Fragmento 004: registro individual do boletim -->
+    <template id="ta-aluno-fragment-004">
+
+        <tr class="boletim-row border-b border-slate-100
+                   hover:bg-slate-50/50 transition">
+
+            <td class="p-3 font-semibold text-slate-800
+                       whitespace-nowrap">
+                __TA_SLOT_0__
+            </td>
+
+            <td class="p-3 text-slate-600">
+                __TA_SLOT_1__
+            </td>
+
+            <td class="p-3 text-slate-600">
+                __TA_SLOT_2__
+            </td>
+
+            <td class="p-3 text-slate-600">
+                __TA_SLOT_3__
+            </td>
+
+            <td class="p-3 text-slate-600">
+                __TA_SLOT_4__
+            </td>
+
+            <td class="p-3 font-bold text-sm text-brand-blue">
+                __TA_SLOT_5__
+            </td>
+
+            <td class="p-3">
+
+                <span class="px-2.5 py-1 rounded-full
+                             text-[10px] font-bold border
+                             __TA_SLOT_6__">
+
+                    __TA_SLOT_7__
+                </span>
+
+            </td>
+
+        </tr>
+
+    </template>
+
+    <!-- Fragmento 005: estrutura da listagem geral de quizzes -->
+    <template id="ta-aluno-fragment-005">
+
+        <section class="space-y-4">
+
+            <p class="text-sm text-slate-500">
+
+                Escolha um questionário para abri-lo em uma
+                tela própria. Os quizzes vinculados a uma aula
+                também ficam disponíveis dentro dessa aula.
+            </p>
+
+            __TA_SLOT_0__
+
+        </section>
+
+    </template>
+
+    <!-- Fragmento 006: ausência de questionários -->
+    <template id="ta-aluno-fragment-006">
+
+        <p class="text-sm text-slate-400">
+            Nenhum quiz cadastrado.
+        </p>
+
+    </template>
+
+    <!-- Fragmento 007: cartão da listagem geral de quizzes -->
+    <template id="ta-aluno-fragment-007">
+
+        <article class="bg-white p-5 rounded-2xl
+                        border border-blue-100 flex flex-col
+                        sm:flex-row sm:items-center
+                        justify-between gap-3">
+
+            <div>
+
+                <p class="font-bold text-slate-800">
+                    __TA_SLOT_0__
+                </p>
+
+                <p class="text-xs text-slate-500 mt-1">
+
+                    __TA_SLOT_1__ ·
+                    __TA_SLOT_2__ pergunta(s) ·
+                    __TA_SLOT_3__ XP ·
+                    Publicado em __TA_SLOT_4__
+                </p>
+
+                <!-- Situação retornada pela API -->
+                <span class="inline-block mt-2 text-xs
+                             __TA_SLOT_5__">
+
+                    __TA_SLOT_6__
+                </span>
+
+            </div>
+
+            <button type="button"
+                    data-abrir-quiz="1"
+                    data-disciplina-id="__TA_SLOT_7__"
+                    data-quiz-id="__TA_SLOT_8__"
+                    class="quiz-access-button
+                           quiz-access-button--standard
+                           px-4 py-2 text-white rounded-lg
+                           text-xs font-bold">
+
+                __TA_SLOT_9__
+            </button>
+
+        </article>
+
+    </template>
+
+    <!-- Fragmento 008: resultado oficial do questionário -->
+    <template id="ta-aluno-fragment-008">
+
+        <section class="max-w-3xl mx-auto bg-white p-8
+                        rounded-2xl border shadow-sm text-center">
+
+            <div class="text-4xl text-emerald-500 mb-3">
+
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+
+            <h2 class="text-xl font-bold">
+                Quiz finalizado!
+            </h2>
+
+            <p class="mt-2 text-slate-600">
+
+                Você acertou __TA_SLOT_0__
+                de __TA_SLOT_1__ perguntas.
+            </p>
+
+            <p class="mt-2 font-bold text-amber-600">
+                +__TA_SLOT_2__ XP
+            </p>
+
+            <!-- O JavaScript define a tela de retorno -->
+            <button type="button"
+                    data-action="back-to-discipline"
+                    data-disciplina-id="__TA_SLOT_3__"
+                    class="mt-5 px-5 py-2 bg-brand-blue
+                           text-white rounded-lg font-bold">
+
+                Voltar
+            </button>
+
+        </section>
+
+    </template>
+
+    <!-- Fragmento 009: tela de resolução do questionário -->
+    <template id="ta-aluno-fragment-009">
+
+        <section class="max-w-3xl mx-auto bg-white
+                        p-5 md:p-8 rounded-2xl
+                        border border-blue-100 shadow-sm">
+
+            <!-- Retorno à disciplina ou à listagem geral -->
+            <button type="button"
+                    data-action="back-to-discipline"
+                    data-disciplina-id="__TA_SLOT_0__"
+                    class="text-xs font-bold text-brand-blue mb-5">
+
+                <i class="fa-solid fa-arrow-left mr-1"></i>
+
+                Voltar
+            </button>
+
+            <div class="mb-6">
+
+                <p class="text-xs uppercase font-bold
+                          text-amber-600">
+
+                    Questionário acadêmico
+                </p>
+
+                <h2 class="text-xl font-bold text-slate-800 mt-1">
+                    __TA_SLOT_1__
+                </h2>
+
+                <p class="text-sm text-slate-500 mt-2">
+
+                    __TA_SLOT_2__ ·
+                    __TA_SLOT_3__ pergunta(s) ·
+                    Recompensa: __TA_SLOT_4__ XP
+                </p>
+
+            </div>
+
+            __TA_SLOT_5__
+
+        </section>
+
+    </template>
+
+    <!-- Fragmento 010: formulário de envio das respostas -->
+    <template id="ta-aluno-fragment-010">
+
+        <form id="form-responder-quiz" class="space-y-6">
+
+            __TA_SLOT_0__
+
+            <button type="submit"
+                    class="w-full py-3 bg-brand-blue
+                           hover:bg-brand-navy text-white
+                           rounded-xl font-bold">
+
+                Enviar respostas
+            </button>
+
+        </form>
+
+    </template>
+
+    <!-- Fragmento 011: estrutura individual de uma pergunta -->
+    <template id="ta-aluno-fragment-011">
+
+        <fieldset class="p-4 border border-slate-200 rounded-xl">
+
+            <legend class="font-bold text-sm text-slate-800 px-1">
+
+                __TA_SLOT_0__. __TA_SLOT_1__
+            </legend>
+
+            <div class="space-y-2 mt-3">
+                __TA_SLOT_2__
+            </div>
+
+        </fieldset>
+
+    </template>
+
+    <!-- Fragmento 012: alternativa de uma pergunta -->
+    <template id="ta-aluno-fragment-012">
+
+        <label class="flex items-center gap-2 p-3
+                      border rounded-lg hover:border-blue-300
+                      cursor-pointer">
+
+            <input type="radio"
+                   name="pergunta-__TA_SLOT_0__"
+                   value="__TA_SLOT_1__"
+                   required>
+
+            <span class="text-sm">
+                __TA_SLOT_2__
+            </span>
+
+        </label>
+
+    </template>
+
+    <!-- Fragmento 013: aviso de questionário já concluído -->
+    <template id="ta-aluno-fragment-013">
+
+        <div class="p-4 bg-emerald-50 border
+                    border-emerald-200 rounded-xl
+                    text-emerald-800 font-semibold">
+
+            Você já concluiu este quiz.
+
+            Resultado: __TA_SLOT_0__
+            de __TA_SLOT_1__ acertos.
+        </div>
+
+    </template>
+
+    <!-- Fragmento 014: detalhes da disciplina selecionada -->
+    <template id="ta-aluno-fragment-014">
+
+        <section class="bg-slate-50 p-5 md:p-6 rounded-2xl
+                        border border-blue-200 shadow-md
+                        space-y-5 animate-fade-in">
+
+            <!-- Identificação da disciplina -->
+            <div class="flex flex-col sm:flex-row
+                        justify-between gap-3 pb-4
+                        border-b border-slate-200">
+
+                <div>
+
+                    <span class="text-xs font-bold text-brand-blue">
+                        __TA_SLOT_0__
+                    </span>
+
+                    <h2 class="text-lg font-bold text-slate-800">
+                        __TA_SLOT_1__
+                    </h2>
+
+                    <p class="text-xs text-slate-500 mt-1">
+
+                        Aulas, slides e quizzes organizados
+                        por encontro.
+                    </p>
+
+                </div>
+
+                <button type="button"
+                        data-action="back-to-disciplines"
+                        class="px-3 py-2 bg-white border
+                               rounded-lg text-xs font-bold
+                               hover:bg-slate-100 transition">
+
+                    <i class="fa-solid fa-arrow-left mr-1"></i>
+
+                    Voltar
+                </button>
+
+            </div>
+
+            <!-- Aulas e materiais vinculados à disciplina -->
+            <section class="space-y-4">
+
+                <h3 class="font-bold text-sm text-slate-800">
+
+                    Aulas e materiais (__TA_SLOT_2__)
+                </h3>
+
+                <div class="space-y-4">
+                    __TA_SLOT_3__
+                </div>
+
+            </section>
+
+            <!--
+                Questionários gerais da disciplina.
+
+                O JavaScript renderiza separadamente
+                os grupos de pendentes e concluídos.
+            -->
+            <div class="space-y-5">
+                __TA_SLOT_4__
+            </div>
+
+        </section>
+
+    </template>
+
+    <!--
+        Fragmento 015: agrupamento de questionários.
+
+        Slot 0: cartões dos questionários.
+        Slot 1: classe visual do título.
+        Slot 2: ícone correspondente à situação.
+        Slot 3: título e quantidade de questionários.
+    -->
+    <template id="ta-aluno-fragment-015">
+
+        <section class="pt-4 space-y-3
+                        border-t border-slate-200">
+
+            <h3 class="font-bold text-sm flex items-center
+                       gap-2 __TA_SLOT_1__">
+
+                <i class="__TA_SLOT_2__"
+                   aria-hidden="true">
+                </i>
+
+                <span>__TA_SLOT_3__</span>
+            </h3>
+
+            <div class="space-y-3">
+                __TA_SLOT_0__
+            </div>
+
+        </section>
+
+    </template>
+
+    <!--
+        Fragmento 016: cartão de questionário da disciplina.
+
+        Slot 0: título do questionário.
+        Slot 1: identificador da disciplina.
+        Slot 2: identificador do questionário.
+        Slot 3: classe visual da descrição.
+        Slot 4: recompensa ou resultado obtido.
+        Slot 5: classe visual do botão.
+        Slot 6: texto da ação disponível.
+    -->
+    <template id="ta-aluno-fragment-016">
+
+        <article class="p-4 bg-white border border-slate-200
+                        rounded-xl flex flex-col sm:flex-row
+                        sm:items-center justify-between gap-3
+                        shadow-sm">
+
+            <!-- Informações e situação do questionário -->
+            <div class="min-w-0">
+
+                <p class="font-semibold text-sm text-slate-800">
+                    __TA_SLOT_0__
+                </p>
+
+                <p class="text-xs mt-1 __TA_SLOT_3__">
+                    __TA_SLOT_4__
+                </p>
+
+            </div>
+
+            <!--
+                Abre diretamente o quiz pendente ou
+                apresenta o resultado do quiz concluído.
+            -->
+            <button type="button"
+                    data-abrir-quiz="1"
+                    data-disciplina-id="__TA_SLOT_1__"
+                    data-quiz-id="__TA_SLOT_2__"
+                    class="px-4 py-2 rounded-lg text-xs
+                           font-bold transition shrink-0
+                           __TA_SLOT_5__">
+
+                __TA_SLOT_6__
+            </button>
+
+        </article>
+
+    </template>
+
+    <!-- Fragmento 017: ausência de aulas publicadas -->
+    <template id="ta-aluno-fragment-017">
+
+        <p class="text-sm text-slate-400">
+
+            Nenhuma aula publicada nesta disciplina.
+        </p>
+
+    </template>
+
+    <!-- Fragmento 018: cartão de aula e materiais -->
+    <template id="ta-aluno-fragment-018">
+
+        <article class="p-4 rounded-xl border border-blue-100
+                        bg-white space-y-3">
+
+            <div class="flex items-start gap-3">
+
+                <div class="w-10 h-10 rounded-xl bg-red-50
+                            text-red-600 flex items-center
+                            justify-center shrink-0">
+
+                    <i class="fa-solid fa-file-pdf text-lg"></i>
+                </div>
+
+                <div class="flex-1">
+
+                    <h3 class="font-bold text-sm text-slate-800">
+                        __TA_SLOT_0__
+                    </h3>
+
+                    <p class="text-xs text-slate-500 mt-1">
+
+                        __TA_SLOT_1__ ·
+                        Publicada em __TA_SLOT_2__
+                    </p>
+
+                </div>
+
+            </div>
+
+            <!-- Visualização do material didático -->
+            __TA_SLOT_3__
+
+            <!-- Ações disponíveis para o material -->
+            <div class="flex flex-wrap gap-2">
+                __TA_SLOT_4__
+            </div>
+
+            <!-- Questionários vinculados especificamente à aula -->
+            <section class="border-t border-slate-100 pt-3">
+
+                <h4 class="font-bold text-xs uppercase
+                           tracking-wide text-slate-500 mb-2">
+
+                    <i class="fa-solid fa-square-question
+                              text-amber-500 mr-1">
+                    </i>
+
+                    Quiz desta aula
+                </h4>
+
+                __TA_SLOT_5__
+
+            </section>
+
+        </article>
+
+    </template>
+
+    <!-- Fragmento 019: material didático indisponível -->
+    <template id="ta-aluno-fragment-019">
+
+        <div class="p-3 rounded-lg bg-amber-50
+                    text-amber-800 text-xs">
+
+            O professor ainda não anexou o conteúdo PDF
+            deste material. Quando o arquivo for publicado,
+            ele aparecerá aqui para leitura.
+        </div>
+
+    </template>
+
+    <!-- Fragmento 020: visualização de material PDF -->
+    <template id="ta-aluno-fragment-020">
+
+        <div class="rounded-lg overflow-hidden
+                    border border-slate-200">
+
+            <iframe title="Visualização de __TA_SLOT_0__"
+                    src="__TA_SLOT_1__"
+                    class="pdf-preview-frame w-full"
+                    loading="lazy">
+            </iframe>
+
+        </div>
+
+    </template>
+
+    <!-- Fragmento 021: download de material acadêmico -->
+    <template id="ta-aluno-fragment-021">
+
+        <a href="__TA_SLOT_0__"
+           download="__TA_SLOT_1__"
+           class="px-3 py-2 bg-slate-100 hover:bg-slate-200
+                  text-slate-700 text-xs font-bold rounded-lg">
+
+            <i class="fa-solid fa-download mr-1"></i>
+
+            Baixar PDF
+        </a>
+
+    </template>
+
+    <!-- Fragmento 022: ausência de quizzes vinculados à aula -->
+    <template id="ta-aluno-fragment-022">
+
+        <p class="text-xs text-slate-400">
+
+            Nenhum quiz vinculado a esta aula.
+        </p>
+
+    </template>
+
+    <!-- Fragmento 023: cartão de quiz vinculado a uma aula -->
+    <template id="ta-aluno-fragment-023">
+
+        <article class="flex flex-col sm:flex-row
+                        sm:items-center justify-between gap-3
+                        rounded-lg bg-amber-50/60
+                        border border-amber-100 p-3 mb-2">
+
+            <div>
+
+                <p class="font-bold text-sm text-slate-800">
+                    __TA_SLOT_0__
+                </p>
+
+                <p class="text-xs text-slate-500 mt-1">
+
+                    __TA_SLOT_1__ pergunta(s) ·
+                    __TA_SLOT_2__ ·
+                    __TA_SLOT_3__ XP ·
+                    Publicado em __TA_SLOT_4__
+                </p>
+
+            </div>
+
+            <button type="button"
+                    data-abrir-quiz="1"
+                    data-disciplina-id="__TA_SLOT_5__"
+                    data-quiz-id="__TA_SLOT_6__"
+                    class="quiz-access-button
+                           quiz-access-button--play
+                           px-4 py-2 rounded-lg text-white
+                           text-xs font-bold">
+
+                <i class="fa-solid fa-play mr-1"></i>
+
+                __TA_SLOT_7__
+            </button>
+
+        </article>
+
+    </template>
+
+    <!-- Fragmento 024: listagem das disciplinas do aluno -->
+    <template id="ta-aluno-fragment-024">
+
+        <div class="space-y-4">
+
+            <p class="text-xs text-slate-500 font-medium">
+
+                Selecione uma disciplina abaixo para visualizar
+                o conteúdo, slides e questionários disponíveis.
+            </p>
+
+            <!-- Cartões preenchidos com os registros da API -->
+            <div id="lista-disciplinas-cards"
+                 class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                __TA_SLOT_0__
+            </div>
+
+            <!-- Detalhes da disciplina selecionada -->
+            <div id="detalhes-disciplina-container"></div>
+
+        </div>
+
+    </template>
+
+    <!-- Fragmento 025: cartão individual de disciplina -->
+    <template id="ta-aluno-fragment-025">
+
+        <article data-action="open-discipline"
+                 data-disciplina-id="__TA_SLOT_0__"
+                 class="bg-white p-6 rounded-2xl
+                        border border-blue-100 shadow-sm
+                        hover:shadow-md hover:border-brand-blue/50
+                        transition cursor-pointer group
+                        flex flex-col justify-between">
+
+            <div>
+
+                <div class="flex items-center justify-between mb-3">
+
+                    <!-- Código da disciplina -->
+                    <span class="text-xs font-bold px-2.5 py-1
+                                 bg-blue-50 text-brand-blue
+                                 rounded-lg border border-blue-100">
+
+                        __TA_SLOT_1__
+                    </span>
+
+                    <!-- Situação da disciplina -->
+                    <span class="text-[11px] font-semibold
+                                 text-emerald-600 bg-emerald-50
+                                 px-2.5 py-0.5 rounded-full
+                                 border border-emerald-100
+                                 flex items-center gap-1">
+
+                        <i class="fa-solid fa-circle text-[8px]"></i>
+
+                        Ativa
+                    </span>
+
+                </div>
+
+                <h3 class="font-bold text-base text-slate-800
+                           group-hover:text-brand-blue transition">
+
+                    __TA_SLOT_2__
+                </h3>
+
+            </div>
+
+            <!-- Quantidade de aulas e questionários -->
+            <div class="mt-6 pt-4 border-t border-slate-100
+                        flex justify-between items-center
+                        text-xs text-slate-500 font-medium">
+
+                <span class="flex items-center gap-3">
+
+                    <span>
+
+                        <i class="fa-solid fa-file-pdf
+                                  text-red-500 mr-1">
+                        </i>
+
+                        __TA_SLOT_3__ Aulas
+                    </span>
+
+                    <span>
+
+                        <i class="fa-solid fa-square-question
+                                  text-amber-500 mr-1">
+                        </i>
+
+                        __TA_SLOT_4__ Quizzes
+                    </span>
+
+                </span>
+
+                <span class="text-brand-blue font-bold
+                             group-hover:translate-x-1
+                             transition flex items-center gap-1">
+
+                    Acessar
+
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </span>
+
+            </div>
+
+        </article>
+
+    </template>
+
+    <!-- Fragmento 026: indicador de XP acumulado -->
+    <template id="ta-aluno-fragment-026">
+
+        <span>__TA_SLOT_0__</span>
+
+        <span class="text-[10px] uppercase">
+            XP
+        </span>
+
+    </template>
+
+    <!-- Fragmento 027: cabeçalho da central de notificações -->
+    <template id="ta-aluno-fragment-027">
+
+        <div class="flex items-center justify-between
+                    border-b pb-2 mb-2">
+
+            <strong class="text-sm">
+                Notificações
+            </strong>
+
+            <button id="marcar-notificacoes-lidas"
+                    type="button"
+                    class="notification-mark-read">
+
+                Marcar como lidas
+            </button>
+
+        </div>
+
+        __TA_SLOT_0__
+
+    </template>
+
+    <!-- Fragmento 028: ausência de notificações -->
+    <template id="ta-aluno-fragment-028">
+
+        <p class="text-sm text-slate-500 py-3">
+
+            Nenhuma notificação por enquanto.
+        </p>
+
+    </template>
+
+    <!-- Fragmento 029: notificação individual -->
+    <template id="ta-aluno-fragment-029">
+
+        <article class="p-3 rounded-lg mb-2 __TA_SLOT_0__">
+
+            <div class="font-bold text-sm">
+
+                __TA_SLOT_1__: __TA_SLOT_2__
+            </div>
+
+            <div class="text-xs text-slate-500 mt-1">
+
+                __TA_SLOT_3__ · __TA_SLOT_4__
+            </div>
+
+        </article>
+
+    </template>
+
+    <!-- Fragmento 030: ausência de notas publicadas -->
+    <template id="ta-aluno-fragment-030">
+
+        <section class="max-w-3xl mx-auto bg-white p-8
+                        rounded-2xl border border-blue-100
+                        shadow-sm text-center">
+
+            <i class="fa-solid fa-clipboard-list text-4xl
+                      text-brand-blue mb-4">
+            </i>
+
+            <h2 class="text-lg font-bold text-slate-800">
+
+                Nenhuma nota publicada ainda
+            </h2>
+
+            <p class="text-sm text-slate-500 mt-2">
+
+                Quando o professor salvar e publicar suas notas,
+                elas aparecerão aqui automaticamente.
+            </p>
+
+        </section>
+
+    </template>
+
+    <!-- Alerta acadêmico de limite de faltas -->
+    <div id="alerta-faltas-critico"
+         role="alert"
+         class="hidden bg-red-50 border-l-4 border-red-500
+                p-4 rounded-xl shadow-sm mb-6
+                flex items-start gap-3">
+
+        <i class="fa-solid fa-triangle-exclamation
+                  text-red-500 text-xl mt-0.5">
+        </i>
+
+        <div>
+
+            <h4 class="text-sm font-bold text-red-800">
+
+                Atenção Crítica: Limite de Faltas Excedido!
+            </h4>
+
+            <p class="text-xs text-red-700 mt-0.5">
+
+                Você acumulou 15 ou mais faltas em uma ou mais
+                disciplinas. Procure a secretaria acadêmica
+                ou coordenação para evitar reprovação por falta.
+            </p>
+
+        </div>
+
+    </div>
+
+    <!--
+        Carregamento dos scripts do painel.
+
+        A ordem deve ser preservada para garantir
+        que as integrações tenham acesso ao estado
+        e às funcionalidades da aplicação principal.
+    -->
+    <!-- Funcionalidades principais do painel acadêmico. -->
+    <script src="js/app-aluno.js"></script>
+    <script src="js/quiz-aluno-api.js"></script>
+    <script src="js/disciplinas-aluno-api.js"></script>
+    <script src="js/boletim-aluno-api.js"></script>
+    <script src="js/perfil-api.js"></script>
+    <script src="js/notificacoes-aluno-api.js"></script>
+    <script src="js/mobile-menu.js"></script>
+
+</body>
+</html>
