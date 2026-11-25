@@ -1,5 +1,5 @@
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import {
   View,
@@ -392,6 +392,216 @@ function EstadoVazio({ titulo, descricao }) {
 }
 
 // Componente principal do aplicativo TechAcademy Mobile.
+
+// Apresenta a evolução acadêmica do aluno autenticado.
+function CartaoEvolucaoAluno({ token }) {
+  const [progresso, definirProgresso] = useState(null);
+  const [carregando, definirCarregando] = useState(true);
+  const [erro, definirErro] = useState('');
+  const [tentativa, definirTentativa] = useState(0);
+
+  // Consulta os dados reais de XP na API.
+  useEffect(() => {
+    let ativo = true;
+
+    async function consultarEvolucao() {
+      definirCarregando(true);
+      definirErro('');
+      definirProgresso(null);
+
+      try {
+        const { resposta, dadosResposta } = await requisitarApi(
+          '/alunos/me/xp',
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!resposta.ok) {
+          throw new Error('Falha ao consultar XP.');
+        }
+
+        if (
+          !Number.isFinite(dadosResposta.xpTotal) ||
+          !Number.isFinite(dadosResposta.nivel) ||
+          !Number.isFinite(dadosResposta.percentualProgresso)
+        ) {
+          throw new Error('Dados de evolução inválidos.');
+        }
+
+        if (ativo) {
+          definirProgresso(dadosResposta);
+        }
+      } catch {
+        if (ativo) {
+          definirErro('Não foi possível carregar sua evolução.');
+        }
+      } finally {
+        if (ativo) {
+          definirCarregando(false);
+        }
+      }
+    }
+
+    consultarEvolucao();
+
+    return () => {
+      ativo = false;
+    };
+  }, [token, tentativa]);
+
+  const percentual = Math.min(
+    100,
+    Math.max(0, progresso?.percentualProgresso ?? 0)
+  );
+
+  return (
+    <View style={[estilos.cartaoDestaque, { minHeight: 132 }]}>
+
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <Text style={estilos.rotuloDestaque}>
+          MINHA EVOLUÇÃO
+        </Text>
+
+        <Image
+          source={require('./assets/simbolo-t-branco.png')}
+          style={{ width: 25, height: 25 }}
+          resizeMode="contain"
+        />
+      </View>
+
+      {carregando ? (
+        <View style={{
+          alignItems: 'center',
+          paddingVertical: 20,
+        }}>
+          <ActivityIndicator color={CORES.branco} />
+
+          <Text style={{
+            color: CORES.branco,
+            fontSize: 11,
+            marginTop: 6,
+          }}>
+            Carregando evolução...
+          </Text>
+        </View>
+
+      ) : erro ? (
+        <View style={{ paddingVertical: 10 }}>
+          <Text style={{
+            color: CORES.branco,
+            fontSize: 12,
+          }}>
+            {erro}
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => definirTentativa(valor => valor + 1)}
+            accessibilityRole="button"
+          >
+            <Text style={{
+              color: CORES.branco,
+              fontWeight: 'bold',
+              marginTop: 8,
+            }}>
+              Tentar novamente
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+      ) : progresso ? (
+        <>
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}>
+            <Text style={{
+              color: CORES.branco,
+              fontSize: 23,
+              fontWeight: 'bold',
+            }}>
+              Nível {progresso.nivel}
+            </Text>
+
+            <Text style={{
+              color: CORES.branco,
+              fontSize: 19,
+              fontWeight: 'bold',
+            }}>
+              {progresso.xpTotal.toLocaleString('pt-BR')} XP
+            </Text>
+          </View>
+
+          {/* Barra de progresso do nível atual. */}
+          <View
+            accessibilityRole="progressbar"
+            accessibilityValue={{
+              min: 0,
+              max: 100,
+              now: percentual,
+            }}
+            style={{
+              height: 8,
+              borderRadius: 8,
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              overflow: 'hidden',
+            }}
+          >
+            <View style={{
+              height: '100%',
+              width: `${percentual}%`,
+              borderRadius: 8,
+              backgroundColor: CORES.branco,
+            }} />
+          </View>
+
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 5,
+          }}>
+            <Text style={{
+              color: CORES.branco,
+              fontSize: 11,
+            }}>
+              {progresso.xpNivelAtual.toLocaleString('pt-BR')}
+              {' / '}
+              {progresso.xpNecessarioPorNivel.toLocaleString('pt-BR')} XP
+            </Text>
+
+            <Text style={{
+              color: CORES.branco,
+              fontSize: 11,
+              fontWeight: 'bold',
+            }}>
+              {percentual}%
+            </Text>
+          </View>
+
+          <Text style={{
+            color: '#DBEAFE',
+            fontSize: 11,
+            marginTop: 7,
+          }}>
+            {progresso.atingiuNivelMaximo
+              ? 'Parabéns! Você atingiu o nível máximo.'
+              : `Faltam ${progresso.xpProximoNivel.toLocaleString('pt-BR')} XP para o próximo nível`}
+          </Text>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 function Aplicativo() {
   const margensSeguras = useSafeAreaInsets();
   // Estados utilizados na autenticação.
@@ -1412,7 +1622,10 @@ function Aplicativo() {
                 </Text>
               </View>
 
-              <View style={estilos.cartaoDestaque}>
+              {usuarioAluno ? (
+  <CartaoEvolucaoAluno token={sessaoUsuario.token} />
+) : (
+  <View style={estilos.cartaoDestaque}>
                 <View style={estilos.linhaDestaque}>
                   <View style={estilos.conteudoDestaque}>
                     <Text style={estilos.rotuloDestaque}>
@@ -1445,8 +1658,8 @@ function Aplicativo() {
                   </Text>
                 </View>
               </View>
-
-              <View style={estilos.cabecalhoSecao}>
+)}
+<View style={estilos.cabecalhoSecao}>
                 <Text style={estilos.tituloSecao}>
                   Acesso rápido
                 </Text>
