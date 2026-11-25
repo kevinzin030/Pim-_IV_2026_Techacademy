@@ -11,7 +11,7 @@ namespace PIM_IV.Painel_ADM.Data
     {
         // Endereço base da API no ambiente de desenvolvimento.
         // Será substituído pelo endereço de produção após a publicação.
-        private const string UrlBaseApi = "http://localhost:3000/api/";
+        private const string UrlBaseApi = "https://techacademy-api-2026-h0ebgpcgechch0c4.brazilsouth-01.azurewebsites.net/api/";
 
         // Mantém uma única instância do HttpClient durante
         // a execução da aplicação, evitando conexões desnecessárias.
