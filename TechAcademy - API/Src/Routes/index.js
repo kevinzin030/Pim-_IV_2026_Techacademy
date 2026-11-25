@@ -1,13 +1,80 @@
 ﻿import { Router } from "express";
-
-import { autenticarToken } from "../Middlewares/autenticarToken.js";
 import { conectarBanco } from "../Config/database.js";
+import { autenticarToken } from "../Middlewares/autenticarToken.js";
+
+import {
+    consultarInicializacao
+} from "../Controllers/InicializacaoController.js";
 
 import {
     realizarLogin,
     alterarSenha,
     consultarPerfil
 } from "../Controllers/AuthController.js";
+
+import {
+    listarUsuarios,
+    listarPerfisCadastro,
+    verificarLogin,
+    cadastrarUsuario,
+    editarUsuario,
+    alterarStatusUsuario
+} from "../Controllers/UsuarioController.js";
+
+import {
+    redefinirSenha
+} from "../Controllers/RedefinicaoSenhaController.js";
+
+import {
+    consultarAutorizacaoAuditoria,
+    listarAuditoria
+} from "../Controllers/AuditoriaController.js";
+
+import {
+    consultarMinhasPermissoes,
+    listarPermissoes,
+    listarPermissoesDoPerfil
+} from "../Controllers/PermissaoController.js";
+
+import {
+    listarPerfis,
+    atualizarPerfil
+} from "../Controllers/PerfilController.js";
+
+import {
+    listarRegistrosAcademicos,
+    salvarRegistroAcademico,
+    alterarStatusAcademico
+} from "../Controllers/GestaoAcademicaController.js";
+
+import {
+    listarOpcoesVinculo,
+    listarVinculosTurma,
+    vincularDisciplina,
+    desvincularDisciplina
+} from "../Controllers/VinculoDisciplinaController.js";
+
+import {
+    listarOpcoesAlocacao,
+    listarDisciplinasAlocacao,
+    consultarProfessorResponsavel,
+    listarAlocacoes,
+    alocarProfessor,
+    substituirProfessor
+} from "../Controllers/AlocacaoProfessorController.js";
+
+import {
+    listarOpcoesMatricula,
+    listarMatriculas,
+    matricularAluno,
+    transferirMatricula,
+    alterarSituacaoMatricula
+} from "../Controllers/MatriculaController.js";
+
+import {
+    listarOpcoesConsultaNotas,
+    consultarNotasCoordenador
+} from "../Controllers/ConsultaNotasController.js";
 
 import {
     listarDisciplinas
@@ -67,19 +134,20 @@ import {
     marcarTodasComoLidas
 } from "../Controllers/NotificacaoController.js";
 
-// Inicializa o roteador principal da API TechAcademy.
 const router = Router();
 
-// Verifica se a API está funcionando.
+// Disponibilidade da API.
+
 router.get("/health", (req, res) => {
-    return res.json({
+    return res.status(200).json({
         sistema: "TechAcademy",
         status: "online",
         mensagem: "API funcionando corretamente"
     });
 });
 
-// Verifica a conexão com o banco de dados Azure SQL.
+// Disponibilidade do banco de dados.
+
 router.get("/status-banco", async (req, res) => {
     try {
         const conexao = await conectarBanco();
@@ -89,207 +157,421 @@ router.get("/status-banco", async (req, res) => {
                 DB_NAME() AS banco,
                 COUNT(*) AS totalTabelas
             FROM sys.tables
-            WHERE is_ms_shipped = 0
+            WHERE is_ms_shipped = 0;
         `);
 
-        return res.json({
+        return res.status(200).json({
             sistema: "TechAcademy",
             status: "conectado",
             ...resultado.recordset[0]
         });
 
     } catch (erro) {
-        console.error(
-            "Erro ao consultar o banco:",
-            erro.message
-        );
+        console.error("Erro na conexão com o banco:", erro);
 
         return res.status(500).json({
-            status: "erro",
-            mensagem:
-                "Não foi possível consultar o banco de dados."
+            sistema: "TechAcademy",
+            status: "desconectado",
+            mensagem: "Não foi possível conectar ao banco."
         });
     }
 });
 
-// Autentica usuários utilizando login e senha.
+// Inicialização do sistema.
+
+router.get(
+    "/inicializacao/status",
+    consultarInicializacao
+);
+
+// Autenticação e perfil.
+
 router.post(
     "/auth/login",
     realizarLogin
 );
 
-// Permite alterar a senha de um usuário autenticado.
 router.post(
     "/auth/alterar-senha",
     autenticarToken,
     alterarSenha
 );
 
-// Retorna os dados do usuário autenticado por JWT.
-router.get("/auth/me", autenticarToken, (req, res) => {
-    return res.status(200).json({
-        mensagem: "Token validado com sucesso.",
-        usuario: req.usuario
-    });
-});
+router.get(
+    "/auth/me",
+    autenticarToken,
+    (req, res) => {
+        return res.status(200).json({
+            mensagem: "Token validado com sucesso.",
+            usuario: req.usuario
+        });
+    }
+);
 
-// Consulta os dados cadastrais atualizados no Azure SQL.
-// A operação é exclusivamente de leitura.
 router.get(
     "/auth/perfil",
     autenticarToken,
     consultarPerfil
 );
 
-// Consulta o cadastro geral de disciplinas.
+// Gerenciamento de usuários.
+
+router.get(
+    "/usuarios",
+    autenticarToken,
+    listarUsuarios
+);
+
+router.get(
+    "/usuarios/perfis",
+    autenticarToken,
+    listarPerfisCadastro
+);
+
+router.get(
+    "/usuarios/verificar-login",
+    autenticarToken,
+    verificarLogin
+);
+
+router.post(
+    "/usuarios",
+    autenticarToken,
+    cadastrarUsuario
+);
+
+router.put(
+    "/usuarios/:idUsuario",
+    autenticarToken,
+    editarUsuario
+);
+
+router.patch(
+    "/usuarios/:idUsuario/status",
+    autenticarToken,
+    alterarStatusUsuario
+);
+
+router.post(
+    "/usuarios/:idUsuario/redefinir-senha",
+    autenticarToken,
+    redefinirSenha
+);
+
+// Permissões e controle de acessos.
+
+router.get(
+    "/permissoes/me",
+    autenticarToken,
+    consultarMinhasPermissoes
+);
+
+router.get(
+    "/permissoes",
+    autenticarToken,
+    listarPermissoes
+);
+
+router.get(
+    "/perfis/:idPerfil/permissoes",
+    autenticarToken,
+    listarPermissoesDoPerfil
+);
+
+router.get(
+    "/perfis",
+    autenticarToken,
+    listarPerfis
+);
+
+router.put(
+    "/perfis/:idPerfil",
+    autenticarToken,
+    atualizarPerfil
+);
+
+// Auditoria administrativa.
+
+router.get(
+    "/auditoria/autorizacao",
+    autenticarToken,
+    consultarAutorizacaoAuditoria
+);
+
+router.get(
+    "/auditoria",
+    autenticarToken,
+    listarAuditoria
+);
+
+// Gerenciamento acadêmico.
+
+router.get(
+    "/academico/:entidade",
+    autenticarToken,
+    listarRegistrosAcademicos
+);
+
+router.post(
+    "/academico/:entidade",
+    autenticarToken,
+    salvarRegistroAcademico
+);
+
+router.put(
+    "/academico/:entidade/:id",
+    autenticarToken,
+    salvarRegistroAcademico
+);
+
+router.patch(
+    "/academico/:entidade/:id/status",
+    autenticarToken,
+    alterarStatusAcademico
+);
+
+// Vinculação de disciplinas.
+
+router.get(
+    "/vinculos/opcoes",
+    autenticarToken,
+    listarOpcoesVinculo
+);
+
+router.get(
+    "/vinculos/turmas/:idTurma",
+    autenticarToken,
+    listarVinculosTurma
+);
+
+router.post(
+    "/vinculos/turmas/:idTurma",
+    autenticarToken,
+    vincularDisciplina
+);
+
+router.delete(
+    "/vinculos/turmas/:idTurma/:idVinculo",
+    autenticarToken,
+    desvincularDisciplina
+);
+
+// Alocação de professores.
+
+router.get(
+    "/alocacoes/opcoes",
+    autenticarToken,
+    listarOpcoesAlocacao
+);
+
+router.get(
+    "/alocacoes/turmas/:idTurma/disciplinas",
+    autenticarToken,
+    listarDisciplinasAlocacao
+);
+
+router.get(
+    "/alocacoes/vinculos/:idVinculo/responsavel",
+    autenticarToken,
+    consultarProfessorResponsavel
+);
+
+router.get(
+    "/alocacoes",
+    autenticarToken,
+    listarAlocacoes
+);
+
+router.post(
+    "/alocacoes",
+    autenticarToken,
+    alocarProfessor
+);
+
+router.put(
+    "/alocacoes/vinculos/:idVinculo",
+    autenticarToken,
+    substituirProfessor
+);
+
+// Gerenciamento de matrículas.
+
+router.get(
+    "/matriculas/opcoes",
+    autenticarToken,
+    listarOpcoesMatricula
+);
+
+router.get(
+    "/matriculas",
+    autenticarToken,
+    listarMatriculas
+);
+
+router.post(
+    "/matriculas",
+    autenticarToken,
+    matricularAluno
+);
+
+router.put(
+    "/matriculas/:idMatricula/transferencia",
+    autenticarToken,
+    transferirMatricula
+);
+
+router.patch(
+    "/matriculas/:idMatricula/situacao",
+    autenticarToken,
+    alterarSituacaoMatricula
+);
+
+// Consulta de notas pelo coordenador.
+
+router.get(
+    "/coordenadores/notas/opcoes",
+    autenticarToken,
+    listarOpcoesConsultaNotas
+);
+
+router.get(
+    "/coordenadores/notas",
+    autenticarToken,
+    consultarNotasCoordenador
+);
+
+// Consultas acadêmicas gerais.
+
 router.get(
     "/disciplinas",
     autenticarToken,
     listarDisciplinas
 );
 
-// Consulta o cadastro geral de turmas.
 router.get(
     "/turmas",
     autenticarToken,
     listarTurmas
 );
 
-// Consulta as notas do aluno autenticado.
+// Funcionalidades do aluno.
+
 router.get(
     "/alunos/me/notas",
     autenticarToken,
     consultarMinhasNotas
 );
 
-// Consulta as frequências do aluno autenticado.
 router.get(
     "/alunos/me/frequencias",
     autenticarToken,
     consultarMinhasFrequencias
 );
 
-// Consulta as disciplinas vinculadas ao aluno.
 router.get(
     "/alunos/me/disciplinas",
     autenticarToken,
     consultarMinhasDisciplinas
 );
 
-// Consulta as turmas vinculadas ao aluno.
 router.get(
     "/alunos/me/turmas",
     autenticarToken,
     consultarMinhaTurma
 );
 
-// Consulta as aulas disponíveis para o aluno.
 router.get(
     "/alunos/me/aulas",
     autenticarToken,
     listarAulasAluno
 );
 
-// Consulta os materiais acadêmicos de uma aula.
 router.get(
     "/alunos/me/aulas/:idAula/materiais",
     autenticarToken,
     listarMateriaisAluno
 );
 
-// Permite ao aluno baixar um material autorizado.
 router.get(
     "/alunos/me/materiais/:idMaterial/download",
     autenticarToken,
     baixarMaterialAluno
 );
 
-// Consulta os quizzes disponíveis para o aluno.
 router.get(
     "/alunos/me/quizzes",
     autenticarToken,
     listarQuizzesAluno
 );
 
-// Consulta as perguntas e alternativas de um quiz.
 router.get(
     "/alunos/me/quizzes/:idQuiz",
     autenticarToken,
     consultarQuizAluno
 );
 
-// Registra as respostas do aluno e calcula o XP.
 router.post(
     "/alunos/me/quizzes/:idQuiz/respostas",
     autenticarToken,
     responderQuiz
 );
 
-// Consulta o XP e o nível do aluno.
 router.get(
     "/alunos/me/xp",
     autenticarToken,
     consultarMeuXP
 );
 
-// Consulta as turmas e disciplinas do professor.
+// Funcionalidades do professor.
+
 router.get(
     "/professores/me/turmas",
     autenticarToken,
     consultarMinhasTurmas
 );
 
-// Consulta os alunos vinculados ao professor.
 router.get(
     "/professores/me/alunos",
     autenticarToken,
     consultarMeusAlunos
 );
 
-// Consulta as notas dos alunos.
 router.get(
     "/professores/me/notas",
     autenticarToken,
     consultarNotasDosAlunos
 );
 
-// Registra ou atualiza as notas dos alunos.
 router.post(
     "/professores/me/notas",
     autenticarToken,
     lancarNota
 );
 
-// Consulta as frequências dos alunos.
 router.get(
     "/professores/me/frequencias",
     autenticarToken,
     consultarFrequenciasDosAlunos
 );
 
-// Registra ou atualiza presenças e faltas.
-// Valida o vínculo acadêmico e o histórico escolar.
 router.post(
     "/professores/me/frequencias",
     autenticarToken,
     lancarFrequencia
 );
 
-// Permite ao professor cadastrar uma aula.
 router.post(
     "/professores/me/aulas",
     autenticarToken,
     cadastrarAula
 );
 
-// Consulta as aulas vinculadas ao professor.
 router.get(
     "/professores/me/aulas",
     autenticarToken,
     listarAulasProfessor
 );
 
-// Permite publicar um material acadêmico em PDF.
 router.post(
     "/professores/me/aulas/:idAula/materiais",
     autenticarToken,
@@ -297,62 +579,54 @@ router.post(
     publicarMaterial
 );
 
-// Consulta os materiais publicados em uma aula.
 router.get(
     "/professores/me/aulas/:idAula/materiais",
     autenticarToken,
     listarMateriaisProfessor
 );
 
-// Permite ao professor baixar um material autorizado.
 router.get(
     "/professores/me/materiais/:idMaterial/download",
     autenticarToken,
     baixarMaterialProfessor
 );
 
-// Permite ao professor cadastrar um quiz.
 router.post(
     "/professores/me/quizzes",
     autenticarToken,
     criarQuiz
 );
 
-// Consulta os quizzes cadastrados pelo professor.
 router.get(
     "/professores/me/quizzes",
     autenticarToken,
     listarQuizzesProfessor
 );
 
-// Consulta o desempenho individual nos quizzes.
 router.get(
     "/professores/me/quizzes/desempenho",
     autenticarToken,
     consultarDesempenhoQuizzes
 );
 
-// Consulta as notificações do usuário autenticado.
+// Notificações.
+
 router.get(
     "/notificacoes/me",
     autenticarToken,
     listarNotificacoes
 );
 
-// Marca todas as notificações do usuário como lidas.
 router.patch(
     "/notificacoes/me/todas/lida",
     autenticarToken,
     marcarTodasComoLidas
 );
 
-// Marca uma notificação específica como lida.
-// A operação é restrita ao destinatário autenticado.
 router.patch(
     "/notificacoes/me/:idNotificacao/lida",
     autenticarToken,
     marcarNotificacaoComoLida
 );
 
-// Exporta o roteador para o servidor Express.
 export default router;

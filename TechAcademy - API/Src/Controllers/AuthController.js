@@ -1,4 +1,3 @@
-
 import jwt from "jsonwebtoken";
 import sql from "mssql";
 import { conectarBanco } from "../Config/database.js";
@@ -11,8 +10,9 @@ import {
 // Autentica o usuário utilizando as credenciais armazenadas no Azure SQL.
 export async function realizarLogin(req, res) {
     try {
-        const { login, senha } = req.body ?? {};
+        const { login, senha, plataforma } = req.body ?? {};
 
+        // Valida as credenciais recebidas na requisição.
         if (
             typeof login !== "string" ||
             login.trim().length === 0 ||
@@ -26,29 +26,37 @@ export async function realizarLogin(req, res) {
 
         const conexao = await conectarBanco();
 
+        // Consulta os dados cadastrais e o perfil do usuário.
         const resultado = await conexao.request()
             .input("login", sql.NVarChar(100), login.trim())
             .query(`
                 SELECT
-                    IdUsuario,
-                    NomeCompleto,
-                    Login,
-                    SenhaHash,
-                    IdPerfil,
-                    Ativo,
-                    DeveAlterarSenha
-                FROM dbo.Usuarios
-                WHERE Login = @login
+                    u.IdUsuario,
+                    u.NomeCompleto,
+                    u.Login,
+                    u.SenhaHash,
+                    u.IdPerfil,
+                    u.Ativo,
+                    u.DeveAlterarSenha,
+                    u.DataCadastro,
+                    p.NomePerfil,
+                    p.Ativo AS PerfilAtivo
+                FROM dbo.Usuarios u
+                INNER JOIN dbo.Perfis p
+                    ON p.IdPerfil = u.IdPerfil
+                WHERE u.Login = @login
             `);
 
         const usuario = resultado.recordset[0];
 
+        // Impede a autenticação de usuários inexistentes.
         if (!usuario) {
             return res.status(401).json({
                 mensagem: "Login ou senha inválidos."
             });
         }
 
+        // Compara a senha informada com o hash armazenado.
         const senhaValida = await verificarSenha(
             senha,
             usuario.SenhaHash
@@ -60,12 +68,26 @@ export async function realizarLogin(req, res) {
             });
         }
 
-        if (!usuario.Ativo) {
+        // Impede o acesso de contas ou perfis desativados.
+        if (!usuario.Ativo || !usuario.PerfilAtivo) {
             return res.status(403).json({
                 mensagem: "Conta desativada. Entre em contato com o administrador."
             });
         }
 
+        // Restringe o acesso solicitado pelo painel administrativo.
+        // Os endpoints administrativos também devem validar
+        // as permissões do usuário diretamente no servidor.
+        if (
+            plataforma === "desktop" &&
+            !["Administrador", "Coordenador"].includes(usuario.NomePerfil)
+        ) {
+            return res.status(403).json({
+                mensagem: "Perfil não autorizado a acessar o painel administrativo."
+            });
+        }
+
+        // Obtém a chave secreta utilizada na assinatura do JWT.
         const chaveJwt = process.env.JWT_SECRET;
 
         if (!chaveJwt || chaveJwt.length < 32) {
@@ -76,6 +98,7 @@ export async function realizarLogin(req, res) {
             });
         }
 
+        // Gera o token de autenticação com validade de duas horas.
         const token = jwt.sign(
             {
                 idUsuario: usuario.IdUsuario,
@@ -88,6 +111,8 @@ export async function realizarLogin(req, res) {
             }
         );
 
+        // Retorna os dados necessários para as plataformas,
+        // sem expor o hash da senha.
         return res.status(200).json({
             mensagem: "Login realizado com sucesso.",
             token,
@@ -96,9 +121,13 @@ export async function realizarLogin(req, res) {
                 nomeCompleto: usuario.NomeCompleto,
                 login: usuario.Login,
                 idPerfil: usuario.IdPerfil,
+                perfil: usuario.NomePerfil,
+                ativo: Boolean(usuario.Ativo),
+                dataCadastro: usuario.DataCadastro,
                 deveAlterarSenha: Boolean(usuario.DeveAlterarSenha)
             }
         });
+
     } catch (erro) {
         console.error("Erro ao realizar login:", erro.message);
 
@@ -114,6 +143,7 @@ export async function alterarSenha(req, res) {
     try {
         const idUsuario = req.usuario?.idUsuario;
 
+        // Verifica se existe um usuário autenticado.
         if (!idUsuario) {
             return res.status(401).json({
                 mensagem: "Usuário não autenticado."
@@ -126,6 +156,7 @@ export async function alterarSenha(req, res) {
             confirmarNovaSenha
         } = req.body ?? {};
 
+        // Valida o preenchimento dos campos obrigatórios.
         if (
             typeof senhaAtual !== "string" ||
             typeof novaSenha !== "string" ||
@@ -137,18 +168,21 @@ export async function alterarSenha(req, res) {
             });
         }
 
+        // Verifica se a confirmação corresponde à nova senha.
         if (novaSenha !== confirmarNovaSenha) {
             return res.status(400).json({
                 mensagem: "A confirmação não corresponde à nova senha."
             });
         }
 
+        // Impede a reutilização da senha atual.
         if (senhaAtual === novaSenha) {
             return res.status(400).json({
                 mensagem: "A nova senha deve ser diferente da senha atual."
             });
         }
 
+        // Verifica os requisitos de segurança da nova senha.
         const validacao = validarNovaSenha(novaSenha);
 
         if (!validacao.valida) {
@@ -159,10 +193,14 @@ export async function alterarSenha(req, res) {
 
         const conexao = await conectarBanco();
 
+        // Consulta o usuário responsável pela solicitação.
         const resultadoUsuario = await conexao.request()
             .input("idUsuario", sql.Int, idUsuario)
             .query(`
-                SELECT IdUsuario, SenhaHash, Ativo
+                SELECT
+                    IdUsuario,
+                    SenhaHash,
+                    Ativo
                 FROM dbo.Usuarios
                 WHERE IdUsuario = @idUsuario
             `);
@@ -181,6 +219,7 @@ export async function alterarSenha(req, res) {
             });
         }
 
+        // Confirma a senha atual antes de permitir a alteração.
         const senhaAtualValida = await verificarSenha(
             senhaAtual,
             usuario.SenhaHash
@@ -192,6 +231,7 @@ export async function alterarSenha(req, res) {
             });
         }
 
+        // Gera um novo hash utilizando o padrão de segurança do sistema.
         const novoHash = await gerarHashSenha(novaSenha);
 
         // Atualiza o hash somente se a senha anterior não foi alterada
@@ -211,6 +251,7 @@ export async function alterarSenha(req, res) {
                     AND Ativo = 1
             `);
 
+        // Evita sobrescrever alterações simultâneas de senha.
         if (resultadoAtualizacao.rowsAffected[0] !== 1) {
             return res.status(409).json({
                 mensagem: "A senha foi modificada durante a operação. Tente novamente."
@@ -221,6 +262,7 @@ export async function alterarSenha(req, res) {
             mensagem: "Senha alterada com sucesso.",
             deveAlterarSenha: false
         });
+
     } catch (erro) {
         console.error("Erro ao alterar senha:", erro.message);
 
@@ -231,9 +273,9 @@ export async function alterarSenha(req, res) {
 }
 
 /**
-* Consulta os dados cadastrais do usuário autenticado.
-* O identificador é obtido exclusivamente do JWT.
-*/
+ * Consulta os dados cadastrais do usuário autenticado.
+ * O identificador é obtido exclusivamente do JWT.
+ */
 export async function consultarPerfil(req, res) {
     try {
         const idUsuario = req.usuario?.idUsuario;
@@ -246,6 +288,8 @@ export async function consultarPerfil(req, res) {
 
         const conexao = await conectarBanco();
 
+        // Consulta os dados do perfil e os registros acadêmicos
+        // associados ao usuário autenticado.
         const resultado = await conexao.request()
             .input("idUsuario", sql.Int, idUsuario)
             .query(`
@@ -278,12 +322,14 @@ export async function consultarPerfil(req, res) {
             });
         }
 
+        // Impede consultas de contas ou perfis desativados.
         if (!usuario.ativo || !usuario.perfilAtivo) {
             return res.status(403).json({
                 mensagem: "Conta ou perfil desativado."
             });
         }
 
+        // Exige a alteração obrigatória de senha antes da consulta.
         if (usuario.deveAlterarSenha) {
             return res.status(403).json({
                 mensagem: "É necessário alterar a senha.",
@@ -291,6 +337,7 @@ export async function consultarPerfil(req, res) {
             });
         }
 
+        // Retorna somente os dados necessários para a plataforma.
         return res.status(200).json({
             usuario: {
                 idUsuario: usuario.idUsuario,
@@ -305,10 +352,7 @@ export async function consultarPerfil(req, res) {
         });
 
     } catch (erro) {
-        console.error(
-            "Erro ao consultar perfil:",
-            erro.message
-        );
+        console.error("Erro ao consultar perfil:", erro.message);
 
         return res.status(500).json({
             mensagem: "Não foi possível consultar o perfil."
