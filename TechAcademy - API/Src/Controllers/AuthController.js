@@ -229,3 +229,89 @@ export async function alterarSenha(req, res) {
         });
     }
 }
+
+/**
+* Consulta os dados cadastrais do usuário autenticado.
+* O identificador é obtido exclusivamente do JWT.
+*/
+export async function consultarPerfil(req, res) {
+    try {
+        const idUsuario = req.usuario?.idUsuario;
+
+        if (!idUsuario) {
+            return res.status(401).json({
+                mensagem: "Usuário não autenticado."
+            });
+        }
+
+        const conexao = await conectarBanco();
+
+        const resultado = await conexao.request()
+            .input("idUsuario", sql.Int, idUsuario)
+            .query(`
+                SELECT
+                    u.IdUsuario AS idUsuario,
+                    u.NomeCompleto AS nomeCompleto,
+                    u.Login AS login,
+                    u.IdPerfil AS idPerfil,
+                    p.NomePerfil AS perfil,
+                    u.Ativo AS ativo,
+                    p.Ativo AS perfilAtivo,
+                    u.DeveAlterarSenha AS deveAlterarSenha,
+                    al.MatriculaAluno AS matriculaAluno,
+                    pr.RegistroProfessor AS registroProfessor
+                FROM dbo.Usuarios u
+                INNER JOIN dbo.Perfis p
+                    ON p.IdPerfil = u.IdPerfil
+                LEFT JOIN dbo.Alunos al
+                    ON al.IdUsuario = u.IdUsuario
+                LEFT JOIN dbo.Professores pr
+                    ON pr.IdUsuario = u.IdUsuario
+                WHERE u.IdUsuario = @idUsuario
+            `);
+
+        const usuario = resultado.recordset[0];
+
+        if (!usuario) {
+            return res.status(404).json({
+                mensagem: "Usuário não encontrado."
+            });
+        }
+
+        if (!usuario.ativo || !usuario.perfilAtivo) {
+            return res.status(403).json({
+                mensagem: "Conta ou perfil desativado."
+            });
+        }
+
+        if (usuario.deveAlterarSenha) {
+            return res.status(403).json({
+                mensagem: "É necessário alterar a senha.",
+                deveAlterarSenha: true
+            });
+        }
+
+        return res.status(200).json({
+            usuario: {
+                idUsuario: usuario.idUsuario,
+                nomeCompleto: usuario.nomeCompleto,
+                login: usuario.login,
+                idPerfil: usuario.idPerfil,
+                perfil: usuario.perfil,
+                ativo: Boolean(usuario.ativo),
+                matriculaAluno: usuario.matriculaAluno,
+                registroProfessor: usuario.registroProfessor
+            }
+        });
+
+    } catch (erro) {
+        console.error(
+            "Erro ao consultar perfil:",
+            erro.message
+        );
+
+        return res.status(500).json({
+            mensagem: "Não foi possível consultar o perfil."
+        });
+    }
+}

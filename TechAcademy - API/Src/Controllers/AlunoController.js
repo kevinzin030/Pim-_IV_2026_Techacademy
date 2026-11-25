@@ -50,14 +50,18 @@ export async function consultarMinhasNotas(req, res) {
         const resultado = await conexao.request()
             .input("idUsuario", sql.Int, idUsuario)
             .query(`
-                SELECT
+                              SELECT
                     n.IdNota AS idNota,
                     n.ValorNota AS valorNota,
                     n.DataLancamento AS dataLancamento,
+                    a.IdAvaliacao AS idAvaliacao,
                     a.Titulo AS avaliacao,
                     a.DataAvaliacao AS dataAvaliacao,
                     a.ValorMaximo AS valorMaximo,
+                    d.IdDisciplina AS idDisciplina,
                     d.NomeDisciplina AS disciplina,
+                    td.IdTurmaDisciplina AS idTurmaDisciplina,
+                    t.IdTurma AS idTurma,
                     t.NomeTurma AS turma,
                     m.Situacao AS situacaoMatricula
                 FROM dbo.Alunos AS al
@@ -69,12 +73,12 @@ export async function consultarMinhasNotas(req, res) {
                     ON a.IdAvaliacao = n.IdAvaliacao
                 INNER JOIN dbo.TurmaDisciplinas AS td
                     ON td.IdTurmaDisciplina = a.IdTurmaDisciplina
-                    AND td.IdTurma = m.IdTurma
                 INNER JOIN dbo.Disciplinas AS d
                     ON d.IdDisciplina = td.IdDisciplina
                 INNER JOIN dbo.Turmas AS t
-                    ON t.IdTurma = m.IdTurma
+                    ON t.IdTurma = td.IdTurma
                 WHERE al.IdUsuario = @idUsuario
+                    AND a.Ativa = 1
                 ORDER BY
                     d.NomeDisciplina ASC,
                     a.DataAvaliacao DESC
@@ -128,6 +132,12 @@ export async function consultarMinhasFrequencias(req, res) {
                     f.IdAula AS idAula,
                     f.Presente AS presente,
                     f.DataRegistro AS dataRegistro,
+                    a.DataAula AS dataAula,
+                    a.Conteudo AS conteudo,
+                    d.IdDisciplina AS idDisciplina,
+                    d.NomeDisciplina AS disciplina,
+                    td.IdTurmaDisciplina AS idTurmaDisciplina,
+                    t.IdTurma AS idTurma,
                     t.NomeTurma AS turma,
                     m.Situacao AS situacaoMatricula
                 FROM dbo.Alunos AS al
@@ -135,10 +145,19 @@ export async function consultarMinhasFrequencias(req, res) {
                     ON m.IdAluno = al.IdAluno
                 INNER JOIN dbo.Frequencias AS f
                     ON f.IdMatricula = m.IdMatricula
+                INNER JOIN dbo.Aulas AS a
+                    ON a.IdAula = f.IdAula
+                INNER JOIN dbo.TurmaDisciplinas AS td
+                    ON td.IdTurmaDisciplina = a.IdTurmaDisciplina
+                INNER JOIN dbo.Disciplinas AS d
+                    ON d.IdDisciplina = td.IdDisciplina
                 INNER JOIN dbo.Turmas AS t
-                    ON t.IdTurma = m.IdTurma
+                    ON t.IdTurma = td.IdTurma
                 WHERE al.IdUsuario = @idUsuario
-                ORDER BY f.DataRegistro DESC
+                    AND a.Realizada = 1
+                ORDER BY
+                    d.NomeDisciplina ASC,
+                    a.DataAula DESC
             `);
 
         // Calcula os totais a partir dos registros retornados.
