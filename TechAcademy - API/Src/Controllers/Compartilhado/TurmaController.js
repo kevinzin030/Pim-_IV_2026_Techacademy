@@ -1,5 +1,5 @@
 
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Consulta as turmas ativas cadastradas no Azure SQL.
 export async function listarTurmas(req, res) {

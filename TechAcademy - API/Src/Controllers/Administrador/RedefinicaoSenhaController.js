@@ -1,10 +1,10 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 import {
     validarNovaSenha,
     gerarHashSenha,
     verificarSenha
-} from "../Utils/senhaHelper.js";
+} from "../../Utils/senhaHelper.js";
 
 // Redefine administrativamente a senha de um usuário.
 export async function redefinirSenha(req, res) {

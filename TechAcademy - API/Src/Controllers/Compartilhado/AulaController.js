@@ -1,6 +1,6 @@
 import sql from "mssql";
 import multer from "multer";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 const TAMANHO_MAXIMO_PDF = 5 * 1024 * 1024;
 

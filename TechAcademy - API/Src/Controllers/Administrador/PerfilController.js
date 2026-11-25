@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Define os perfis reconhecidos pelo sistema.
 const perfisPermitidos = [

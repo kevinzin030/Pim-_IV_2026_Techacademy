@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Verifica a autorização para consultar registros de auditoria.
 async function administradorAutorizado(conexao, idUsuario) {

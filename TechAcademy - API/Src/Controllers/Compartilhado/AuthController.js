@@ -1,11 +1,11 @@
 import jwt from "jsonwebtoken";
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 import {
     verificarSenha,
     validarNovaSenha,
     gerarHashSenha
-} from "../Utils/senhaHelper.js";
+} from "../../Utils/senhaHelper.js";
 
 // Autentica o usuário utilizando as credenciais armazenadas no Azure SQL.
 export async function realizarLogin(req, res) {

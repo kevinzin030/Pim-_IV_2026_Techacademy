@@ -1,5 +1,5 @@
 
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Consulta as disciplinas ativas cadastradas no Azure SQL.
 export async function listarDisciplinas(req, res) {

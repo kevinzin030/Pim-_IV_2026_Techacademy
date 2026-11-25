@@ -1,6 +1,6 @@
 import sql from "mssql";
 
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 /**
  * Consulta o desempenho individual dos alunos nos quizzes.

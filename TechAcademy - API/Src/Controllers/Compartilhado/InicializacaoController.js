@@ -1,4 +1,4 @@
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Verifica se o administrador inicial já foi cadastrado.
 export async function consultarInicializacao(req, res) {

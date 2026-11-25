@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Verifica a autorização do coordenador.
 async function possuiAutorizacao(conexao, idUsuario) {

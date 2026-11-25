@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 /**
  * Consulta as notificações do usuário autenticado.

@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Representa erros de negócio e autorização.
 class ErroOperacao extends Error {

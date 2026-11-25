@@ -1,7 +1,7 @@
 
 import sql from "mssql";
 
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Confirma se o usuário autenticado possui o perfil Aluno.
 async function verificarPerfilAluno(conexao, idUsuario) {

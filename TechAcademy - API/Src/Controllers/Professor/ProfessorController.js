@@ -1,6 +1,6 @@
 import sql from "mssql";
 
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 const TIPOS_AVALIACAO = ["P1", "P2", "Trabalho"];
 

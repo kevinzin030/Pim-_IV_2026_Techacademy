@@ -1,9 +1,9 @@
 import sql from "mssql";
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 import {
     validarNovaSenha,
     gerarHashSenha
-} from "../Utils/senhaHelper.js";
+} from "../../Utils/senhaHelper.js";
 
 // Define os prefixos dos identificadores automáticos.
 const prefixosPorPerfil = {

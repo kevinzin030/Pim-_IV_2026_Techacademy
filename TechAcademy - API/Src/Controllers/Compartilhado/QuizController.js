@@ -1,7 +1,7 @@
 import sql from "mssql";
 import { randomUUID } from "node:crypto";
 
-import { conectarBanco } from "../Config/database.js";
+import { conectarBanco } from "../../Config/database.js";
 
 // Configurações utilizadas na validação dos quizzes.
 const XP_MINIMO = 10;

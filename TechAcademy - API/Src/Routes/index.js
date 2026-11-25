@@ -1,16 +1,16 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { conectarBanco } from "../Config/database.js";
-import { autenticarToken } from "../Middlewares/autenticarToken.js";
+import { autenticarToken } from "../middlewares/autenticarToken.js";
 
 import {
     consultarInicializacao
-} from "../Controllers/InicializacaoController.js";
+} from "../Controllers/Compartilhado/InicializacaoController.js";
 
 import {
     realizarLogin,
     alterarSenha,
     consultarPerfil
-} from "../Controllers/AuthController.js";
+} from "../Controllers/Compartilhado/AuthController.js";
 
 import {
     listarUsuarios,
@@ -19,40 +19,40 @@ import {
     cadastrarUsuario,
     editarUsuario,
     alterarStatusUsuario
-} from "../Controllers/UsuarioController.js";
+} from "../Controllers/Administrador/UsuarioController.js";
 
 import {
     redefinirSenha
-} from "../Controllers/RedefinicaoSenhaController.js";
+} from "../Controllers/Administrador/RedefinicaoSenhaController.js";
 
 import {
     consultarAutorizacaoAuditoria,
     listarAuditoria
-} from "../Controllers/AuditoriaController.js";
+} from "../Controllers/Administrador/AuditoriaController.js";
 
 import {
     consultarMinhasPermissoes,
     listarPermissoes,
     listarPermissoesDoPerfil
-} from "../Controllers/PermissaoController.js";
+} from "../Controllers/Administrador/PermissaoController.js";
 
 import {
     listarPerfis,
     atualizarPerfil
-} from "../Controllers/PerfilController.js";
+} from "../Controllers/Administrador/PerfilController.js";
 
 import {
     listarRegistrosAcademicos,
     salvarRegistroAcademico,
     alterarStatusAcademico
-} from "../Controllers/GestaoAcademicaController.js";
+} from "../Controllers/Coordenador/GestaoAcademicaController.js";
 
 import {
     listarOpcoesVinculo,
     listarVinculosTurma,
     vincularDisciplina,
     desvincularDisciplina
-} from "../Controllers/VinculoDisciplinaController.js";
+} from "../Controllers/Coordenador/VinculoDisciplinaController.js";
 
 import {
     listarOpcoesAlocacao,
@@ -61,7 +61,7 @@ import {
     listarAlocacoes,
     alocarProfessor,
     substituirProfessor
-} from "../Controllers/AlocacaoProfessorController.js";
+} from "../Controllers/Coordenador/AlocacaoProfessorController.js";
 
 import {
     listarOpcoesMatricula,
@@ -69,27 +69,27 @@ import {
     matricularAluno,
     transferirMatricula,
     alterarSituacaoMatricula
-} from "../Controllers/MatriculaController.js";
+} from "../Controllers/Coordenador/MatriculaController.js";
 
 import {
     listarOpcoesConsultaNotas,
     consultarNotasCoordenador
-} from "../Controllers/ConsultaNotasController.js";
+} from "../Controllers/Coordenador/ConsultaNotasController.js";
 
 import {
     listarDisciplinas
-} from "../Controllers/DisciplinaController.js";
+} from "../Controllers/Compartilhado/DisciplinaController.js";
 
 import {
     listarTurmas
-} from "../Controllers/TurmaController.js";
+} from "../Controllers/Compartilhado/TurmaController.js";
 
 import {
     consultarMinhasNotas,
     consultarMinhasFrequencias,
     consultarMinhasDisciplinas,
     consultarMinhaTurma
-} from "../Controllers/AlunoController.js";
+} from "../Controllers/Aluno/AlunoController.js";
 
 import {
     consultarMinhasTurmas,
@@ -97,7 +97,7 @@ import {
     consultarNotasDosAlunos,
     consultarFrequenciasDosAlunos,
     lancarNota
-} from "../Controllers/ProfessorController.js";
+} from "../Controllers/Professor/ProfessorController.js";
 
 import {
     criarQuiz,
@@ -106,7 +106,7 @@ import {
     consultarQuizAluno,
     responderQuiz,
     consultarMeuXP
-} from "../Controllers/QuizController.js";
+} from "../Controllers/Compartilhado/QuizController.js";
 
 import {
     cadastrarAula,
@@ -118,21 +118,21 @@ import {
     listarMateriaisAluno,
     baixarMaterialProfessor,
     baixarMaterialAluno
-} from "../Controllers/AulaController.js";
+} from "../Controllers/Compartilhado/AulaController.js";
 
 import {
     consultarDesempenhoQuizzes
-} from "../Controllers/DesempenhoController.js";
+} from "../Controllers/Professor/DesempenhoController.js";
 
 import {
     lancarFrequencia
-} from "../Controllers/FrequenciaController.js";
+} from "../Controllers/Professor/FrequenciaController.js";
 
 import {
     listarNotificacoes,
     marcarNotificacaoComoLida,
     marcarTodasComoLidas
-} from "../Controllers/NotificacaoController.js";
+} from "../Controllers/Compartilhado/NotificacaoController.js";
 
 const router = Router();
 
@@ -630,3 +630,4 @@ router.patch(
 );
 
 export default router;
+
