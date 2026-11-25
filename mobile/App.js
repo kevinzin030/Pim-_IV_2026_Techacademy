@@ -1,3 +1,4 @@
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
 
 import {
@@ -391,7 +392,8 @@ function EstadoVazio({ titulo, descricao }) {
 }
 
 // Componente principal do aplicativo TechAcademy Mobile.
-export default function App() {
+function Aplicativo() {
+  const margensSeguras = useSafeAreaInsets();
   // Estados utilizados na autenticação.
   const [login, definirLogin] = useState('');
   const [senha, definirSenha] = useState('');
@@ -1153,7 +1155,7 @@ export default function App() {
   if (usuarioAlteracaoPendente) {
     return (
       <KeyboardAvoidingView
-        style={estilos.telaAutenticacao}
+        style={[estilos.telaAutenticacao, { paddingTop: margensSeguras.top, paddingBottom: margensSeguras.bottom }]}
         behavior={
           Platform.OS === 'ios'
             ? 'padding'
@@ -1341,7 +1343,7 @@ export default function App() {
       telaAlunos;
 
     return (
-      <View style={estilos.telaPainel}>
+      <View style={[estilos.telaPainel, { borderTopWidth: margensSeguras.top, borderTopColor: CORES.marinho }]}>
         <StatusBar
           style="light"
           backgroundColor={CORES.marinho}
@@ -1379,7 +1381,7 @@ export default function App() {
         </View>
 
         <ScrollView
-          style={estilos.rolagemPainel}
+          style={estilos.rolagemPainel} scrollEnabled={!telaInicio}
           contentContainerStyle={
             estilos.conteudoPainel
           }
@@ -2305,7 +2307,7 @@ export default function App() {
           </Text>
         </ScrollView>
 
-        <View style={estilos.barraNavegacao}>
+        <View style={[estilos.barraNavegacao, { paddingBottom: margensSeguras.bottom + 8 }]}>
           <ItemNavegacao
             simbolo="⌂"
             titulo="Início"
@@ -2369,7 +2371,7 @@ export default function App() {
   // Renderiza o login quando não existe sessão autenticada.
   return (
     <KeyboardAvoidingView
-      style={estilos.telaAutenticacao}
+      style={[estilos.telaAutenticacao, { paddingTop: margensSeguras.top, paddingBottom: margensSeguras.bottom }]}
       behavior={
         Platform.OS === 'ios'
           ? 'padding'
@@ -2836,7 +2838,7 @@ const estilos = StyleSheet.create({
   },
 
   areaBoasVindas: {
-    marginBottom: 17,
+    marginBottom: 10,
   },
 
   saudacao: {
@@ -2855,8 +2857,8 @@ const estilos = StyleSheet.create({
   cartaoDestaque: {
     backgroundColor: CORES.azulPrincipal,
     borderRadius: 18,
-    padding: 19,
-    marginBottom: 23,
+    padding: 12,
+    marginBottom: 12,
     elevation: 3,
   },
 
@@ -2947,9 +2949,9 @@ const estilos = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: CORES.borda,
-    padding: 15,
-    marginBottom: 11,
-    minHeight: 75,
+    padding: 10,
+    marginBottom: 14,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -3258,7 +3260,22 @@ const estilos = StyleSheet.create({
     textAlign: 'center',
     color: CORES.textoDiscreto,
     fontSize: 11,
-    marginTop: 20,
+    marginTop: 6,
   },
 });
 
+
+
+// Respeita as barras nativas do dispositivo.
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: CORES.fundo }}
+        edges={['left', 'right']}
+      >
+        <Aplicativo />
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
