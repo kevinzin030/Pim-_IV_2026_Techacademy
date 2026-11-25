@@ -12,7 +12,7 @@
     "use strict";
 
     const CONFIGURACAO = {
-        enderecoApi: "http://localhost:3000/api",
+        enderecoApi: "https://techacademy-api-2026-h0ebgpcgechch0c4.brazilsouth-01.azurewebsites.net/api",
         chaveToken: "techacademy_token",
         limiteFaltas: 15,
         alertaFaltas: 10,

@@ -1527,7 +1527,7 @@ async function consultarRecursoAula(endpoint) {
     }
 
     const resposta = await fetch(
-        `http://localhost:3000/api${endpoint}`,
+        `https://techacademy-api-2026-h0ebgpcgechch0c4.brazilsouth-01.azurewebsites.net/api${endpoint}`,
         {
             method: "GET",
             cache: "no-store",

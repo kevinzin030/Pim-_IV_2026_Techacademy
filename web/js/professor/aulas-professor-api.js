@@ -5,7 +5,7 @@
 (() => {
     "use strict";
 
-    const API_URL = "http://localhost:3000/api";
+    const API_URL = "https://techacademy-api-2026-h0ebgpcgechch0c4.brazilsouth-01.azurewebsites.net/api";
     const TAMANHO_MAXIMO_PDF = 5 * 1024 * 1024;
 
     const estado = {
