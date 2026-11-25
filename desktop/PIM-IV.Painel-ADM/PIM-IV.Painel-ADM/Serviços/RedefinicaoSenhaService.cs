@@ -1,19 +1,17 @@
 ﻿using System;
-using System.Data;
-using Microsoft.Data.SqlClient;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Seguranca;
 
 namespace PIM_IV.Painel_ADM.Servicos
 {
-    // Gerencia a redefinição administrativa de senhas.
+    // Gerencia a redefinição administrativa de senhas pela API.
     public class RedefinicaoSenhaService
     {
-        private const int TamanhoHash = 500;
-        private const int TamanhoAcao = 100;
-        private const int TamanhoDescricao = 500;
-
         // Redefine a senha e exige sua alteração no próximo acesso.
         public void RedefinirSenha(
             Usuario administrador,
@@ -23,82 +21,64 @@ namespace PIM_IV.Painel_ADM.Servicos
             ValidarAdministrador(administrador);
             ValidarUsuarioDestino(idUsuario);
 
-            // Aplica as mesmas regras utilizadas no cadastro.
+            // Aplica as regras de segurança utilizadas no cadastro.
             UsuarioService.ValidarSenha(novaSenha);
 
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            conexao.Open();
-
-            using SqlTransaction transacao =
-                conexao.BeginTransaction(IsolationLevel.Serializable);
-
-            try
+            // Mantém a compatibilidade com os formulários existentes.
+            Task.Run(async () =>
             {
-                ConfirmarAdministradorNoBanco(
-                    conexao,
-                    transacao,
-                    administrador.IdUsuario);
-
-                string hashAtual = ConsultarHashAtual(
-                    conexao,
-                    transacao,
-                    idUsuario);
-
-                ValidarSenhaDiferente(
-                    novaSenha,
-                    hashAtual);
-
-                string novoHash =
-                    SenhaHelper.GerarHash(novaSenha);
-
-                AtualizarSenha(
-                    conexao,
-                    transacao,
+                await RedefinirSenhaAsync(
                     idUsuario,
-                    novoHash);
+                    novaSenha);
 
-                RegistrarAuditoria(
-                    conexao,
-                    transacao,
-                    administrador.IdUsuario,
-                    idUsuario);
+            }).GetAwaiter().GetResult();
+        }
 
-                transacao.Commit();
-            }
-            catch
+        // Encaminha a solicitação de redefinição para a API.
+        private static async Task RedefinirSenhaAsync(
+            int idUsuario,
+            string novaSenha)
+        {
+            using HttpResponseMessage resposta =
+                await ApiClient.Cliente.PostAsJsonAsync(
+                    $"usuarios/{idUsuario}/redefinir-senha",
+                    new
+                    {
+                        novaSenha
+                    });
+
+            string conteudo =
+                await resposta.Content.ReadAsStringAsync();
+
+            if (!resposta.IsSuccessStatusCode)
             {
-                // Desfaz a alteração caso alguma etapa falhe.
-                if (transacao.Connection != null)
-                {
-                    transacao.Rollback();
-                }
-
-                throw;
+                throw new InvalidOperationException(
+                    ExtrairMensagem(conteudo));
             }
         }
 
-        // Valida os dados do administrador da sessão.
+        // Valida o administrador autenticado.
         private static void ValidarAdministrador(
             Usuario administrador)
         {
-            if (administrador == null)
-            {
-                throw new UnauthorizedAccessException(
-                    "Administrador não identificado.");
-            }
-
-            if (administrador.IdPerfil != 1 ||
+            if (administrador == null ||
+                administrador.IdPerfil != 1 ||
                 !administrador.Ativo)
             {
                 throw new UnauthorizedAccessException(
                     "Apenas administradores podem redefinir senhas.");
             }
+
+            if (!SessaoUsuario.EstaAutenticado)
+            {
+                throw new UnauthorizedAccessException(
+                    "Sessão inválida. Realize o login novamente.");
+            }
         }
 
-        // Verifica se o identificador do usuário é válido.
-        private static void ValidarUsuarioDestino(int idUsuario)
+        // Valida o identificador do usuário de destino.
+        private static void ValidarUsuarioDestino(
+            int idUsuario)
         {
             if (idUsuario <= 0)
             {
@@ -108,170 +88,29 @@ namespace PIM_IV.Painel_ADM.Servicos
             }
         }
 
-        // Confirma a autorização diretamente no banco de dados.
-        private static void ConfirmarAdministradorNoBanco(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idAdministrador)
+        // Recupera a mensagem retornada pela API.
+        private static string ExtrairMensagem(
+            string conteudo)
         {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u WITH (UPDLOCK, HOLDLOCK)
-                INNER JOIN dbo.Perfis p
-                    ON p.IdPerfil = u.IdPerfil
-                WHERE u.IdUsuario = @Administrador
-                  AND u.Ativo = 1
-                  AND p.NomePerfil = N'Administrador'
-                  AND p.Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Administrador",
-                SqlDbType.Int).Value = idAdministrador;
-
-            int autorizado = Convert.ToInt32(
-                comando.ExecuteScalar());
-
-            if (autorizado != 1)
+            try
             {
-                throw new UnauthorizedAccessException(
-                    "Sua conta não possui mais permissão " +
-                    "de Administrador.");
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                if (documento.RootElement.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem))
+                {
+                    return mensagem.GetString()
+                        ?? "Não foi possível redefinir a senha.";
+                }
             }
-        }
-
-        // Consulta a senha atual e bloqueia o registro.
-        private static string ConsultarHashAtual(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idUsuario)
-        {
-            const string sql = @"
-                SELECT SenhaHash
-                FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
-                WHERE IdUsuario = @IdUsuario
-                  AND Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = idUsuario;
-
-            string? hashAtual =
-                comando.ExecuteScalar() as string;
-
-            if (hashAtual == null)
+            catch (JsonException)
             {
-                throw new InvalidOperationException(
-                    "Usuário não encontrado ou desativado.");
+                // Utiliza a mensagem padrão.
             }
 
-            return hashAtual;
-        }
-
-        // Impede a reutilização da senha atual.
-        private static void ValidarSenhaDiferente(
-            string novaSenha,
-            string hashAtual)
-        {
-            bool senhaReutilizada =
-                SenhaHelper.VerificarSenha(
-                    novaSenha,
-                    hashAtual);
-
-            if (senhaReutilizada)
-            {
-                throw new ArgumentException(
-                    "A senha provisória deve ser " +
-                    "diferente da senha atual.");
-            }
-        }
-
-        // Atualiza o hash e marca a troca como obrigatória.
-        private static void AtualizarSenha(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idUsuario,
-            string novoHash)
-        {
-            const string sql = @"
-                UPDATE dbo.Usuarios
-                SET
-                    SenhaHash = @SenhaHash,
-                    DeveAlterarSenha = 1
-                WHERE IdUsuario = @IdUsuario
-                  AND Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@SenhaHash",
-                SqlDbType.NVarChar,
-                TamanhoHash).Value = novoHash;
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = idUsuario;
-
-            int registrosAlterados =
-                comando.ExecuteNonQuery();
-
-            if (registrosAlterados != 1)
-            {
-                throw new InvalidOperationException(
-                    "Não foi possível redefinir a senha.");
-            }
-        }
-
-        // Registra a operação sem armazenar a senha provisória.
-        private static void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idAdministrador,
-            int idUsuario)
-        {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @Administrador,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Administrador",
-                SqlDbType.Int).Value = idAdministrador;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                TamanhoAcao).Value = "REDEFINICAO_SENHA";
-
-            string descricao =
-                $"Administrador redefiniu a senha provisória " +
-                $"do usuário ID {idUsuario}. " +
-                $"Troca obrigatória no próximo acesso.";
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                TamanhoDescricao).Value = descricao;
-
-            comando.ExecuteNonQuery();
+            return "Não foi possível redefinir a senha.";
         }
     }
 }

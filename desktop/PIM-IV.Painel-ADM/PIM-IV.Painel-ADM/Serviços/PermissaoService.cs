@@ -1,21 +1,36 @@
 ﻿using System;
 using System.Data;
-using Microsoft.Data.SqlClient;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
+using PIM_IV.Painel_ADM.Seguranca;
 
 namespace PIM_IV.Painel_ADM.Servicos
 {
-    // Gerencia a consulta das permissões dos usuários e perfis.
+    /// <summary>
+    /// Gerencia a consulta das permissões dos usuários
+    /// e perfis através da API REST do TechAcademy.
+    /// </summary>
     public class PermissaoService
     {
         private const int TamanhoCodigoPermissao = 100;
 
-        // Verifica se um usuário possui determinada permissão.
+        // Configura a interpretação dos dados JSON retornados pela API.
+        private static readonly JsonSerializerOptions OpcoesJson = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        /// <summary>
+        /// Verifica se o usuário autenticado possui determinada permissão.
+        /// </summary>
         public bool UsuarioTemPermissao(
             Usuario usuario,
             string codigoPermissao)
         {
+            // Valida os dados do usuário e da permissão solicitada.
             if (!UsuarioValido(usuario) ||
                 string.IsNullOrWhiteSpace(codigoPermissao))
             {
@@ -29,73 +44,53 @@ namespace PIM_IV.Painel_ADM.Servicos
                 return false;
             }
 
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                INNER JOIN dbo.PerfilPermissoes pp
-                    ON p.IdPerfil = pp.IdPerfil
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND pm.Ativo = 1
-                  AND pm.Codigo = @Codigo";
+            // Consulta as permissões vinculadas à sessão autenticada.
+            DataTable permissoes = ExecutarConsulta(
+                "permissoes/me");
 
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
+            // Verifica se a permissão solicitada está disponível.
+            foreach (DataRow permissao in permissoes.Rows)
+            {
+                string codigo = Convert.ToString(
+                    permissao["Codigo"]) ?? string.Empty;
 
-            using SqlCommand comando =
-                new(sql, conexao);
+                if (string.Equals(
+                    codigo,
+                    codigoPermissao,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
 
-            AdicionarParametroInteiro(
-                comando,
-                "@IdUsuario",
-                usuario.IdUsuario);
-
-            AdicionarParametroTexto(
-                comando,
-                "@Codigo",
-                codigoPermissao,
-                TamanhoCodigoPermissao);
-
-            conexao.Open();
-
-            return Convert.ToInt32(
-                comando.ExecuteScalar()) > 0;
+            return false;
         }
 
-        // Confirma se o objeto representa um usuário ativo.
+        /// <summary>
+        /// Confirma se o usuário está ativo e possui uma sessão local.
+        /// </summary>
         private static bool UsuarioValido(Usuario? usuario)
         {
             return usuario != null &&
                    usuario.IdUsuario > 0 &&
-                   usuario.Ativo;
+                   usuario.Ativo &&
+                   SessaoUsuario.EstaAutenticado;
         }
 
-        // Lista todas as permissões ativas do sistema.
+        /// <summary>
+        /// Lista todas as permissões ativas cadastradas no sistema.
+        /// </summary>
         public DataTable ListarPermissoes()
         {
-            const string sql = @"
-                SELECT
-                    IdPermissao,
-                    Codigo,
-                    Descricao,
-                    Plataforma
-                FROM dbo.Permissoes
-                WHERE Ativo = 1
-                ORDER BY
-                    Plataforma,
-                    Descricao";
-
-            return ExecutarConsulta(sql);
+            return ExecutarConsulta("permissoes");
         }
 
-        // Lista as permissões ativas atribuídas a um perfil.
+        /// <summary>
+        /// Lista as permissões ativas atribuídas ao perfil informado.
+        /// </summary>
         public DataTable ListarPermissoesDoPerfil(int idPerfil)
         {
+            // Impede consultas com identificadores inválidos.
             if (idPerfil <= 0)
             {
                 throw new ArgumentException(
@@ -103,79 +98,147 @@ namespace PIM_IV.Painel_ADM.Servicos
                     nameof(idPerfil));
             }
 
-            const string sql = @"
-                SELECT
-                    pm.IdPermissao,
-                    pm.Codigo,
-                    pm.Descricao,
-                    pm.Plataforma
-                FROM dbo.PerfilPermissoes pp
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE pp.IdPerfil = @IdPerfil
-                  AND pm.Ativo = 1
-                ORDER BY
-                    pm.Plataforma,
-                    pm.Descricao";
-
             return ExecutarConsulta(
-                sql,
-                comando =>
-                {
-                    AdicionarParametroInteiro(
-                        comando,
-                        "@IdPerfil",
-                        idPerfil);
-                });
+                $"perfis/{idPerfil}/permissoes");
         }
 
-        // Executa consultas SQL e retorna os resultados.
-        private static DataTable ExecutarConsulta(
-            string sql,
-            Action<SqlCommand>? configurarParametros = null)
+        /// <summary>
+        /// Mantém a compatibilidade com os formulários existentes,
+        /// que utilizam métodos síncronos e objetos DataTable.
+        /// </summary>
+        private static DataTable ExecutarConsulta(string endpoint)
         {
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
+            return Task.Run(
+                () => ExecutarConsultaAsync(endpoint))
+                .GetAwaiter()
+                .GetResult();
+        }
 
-            using SqlCommand comando =
-                new(sql, conexao);
+        /// <summary>
+        /// Realiza uma consulta HTTP autenticada e converte
+        /// os dados recebidos para uma tabela.
+        /// </summary>
+        private static async Task<DataTable> ExecutarConsultaAsync(
+            string endpoint)
+        {
+            // Impede consultas sem uma sessão autenticada.
+            if (!SessaoUsuario.EstaAutenticado)
+            {
+                throw new UnauthorizedAccessException(
+                    "Usuário não autenticado.");
+            }
 
-            configurarParametros?.Invoke(comando);
+            // Envia a requisição utilizando o cliente HTTP centralizado.
+            using HttpResponseMessage resposta =
+                await ApiClient.Cliente.GetAsync(endpoint);
 
-            conexao.Open();
+            string conteudo =
+                await resposta.Content.ReadAsStringAsync();
 
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
+            // Trata erros de comunicação e autorização.
+            if (!resposta.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    ObterMensagemErro(conteudo));
+            }
 
-            DataTable tabela = new();
+            // Converte a resposta JSON em objetos C#.
+            RespostaPermissoes? resultado =
+                JsonSerializer.Deserialize<RespostaPermissoes>(
+                    conteudo,
+                    OpcoesJson);
 
-            tabela.Load(leitor);
+            if (resultado?.Permissoes == null)
+            {
+                throw new InvalidOperationException(
+                    "A API retornou uma resposta de permissões inválida.");
+            }
+
+            // Preserva a estrutura esperada pelos formulários.
+            DataTable tabela = CriarTabelaPermissoes();
+
+            foreach (DadosPermissao permissao in resultado.Permissoes)
+            {
+                tabela.Rows.Add(
+                    permissao.IdPermissao,
+                    permissao.Codigo,
+                    permissao.Descricao,
+                    permissao.Plataforma);
+            }
 
             return tabela;
         }
 
-        // Adiciona um parâmetro numérico à consulta.
-        private static void AdicionarParametroInteiro(
-            SqlCommand comando,
-            string nome,
-            int valor)
+        /// <summary>
+        /// Cria uma tabela compatível com a estrutura original
+        /// utilizada pelo painel administrativo.
+        /// </summary>
+        private static DataTable CriarTabelaPermissoes()
         {
-            comando.Parameters.Add(
-                nome,
-                SqlDbType.Int).Value = valor;
+            DataTable tabela = new();
+
+            tabela.Columns.Add(
+                "IdPermissao", typeof(int));
+
+            tabela.Columns.Add(
+                "Codigo", typeof(string));
+
+            tabela.Columns.Add(
+                "Descricao", typeof(string));
+
+            tabela.Columns.Add(
+                "Plataforma", typeof(string));
+
+            return tabela;
         }
 
-        // Adiciona um parâmetro de texto à consulta.
-        private static void AdicionarParametroTexto(
-            SqlCommand comando,
-            string nome,
-            string valor,
-            int tamanho)
+        /// <summary>
+        /// Extrai a mensagem de erro retornada pela API.
+        /// </summary>
+        private static string ObterMensagemErro(string conteudo)
         {
-            comando.Parameters.Add(
-                nome,
-                SqlDbType.NVarChar,
-                tamanho).Value = valor;
+            try
+            {
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                if (documento.RootElement.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem))
+                {
+                    return mensagem.GetString()
+                        ?? "Não foi possível consultar as permissões.";
+                }
+            }
+            catch (JsonException)
+            {
+                // Utiliza a mensagem padrão quando o retorno
+                // do servidor não possui um JSON válido.
+            }
+
+            return "Não foi possível consultar as permissões.";
+        }
+
+        /// <summary>
+        /// Representa a resposta dos endpoints de permissões.
+        /// </summary>
+        private sealed class RespostaPermissoes
+        {
+            public DadosPermissao[]? Permissoes { get; set; }
+        }
+
+        /// <summary>
+        /// Representa uma permissão retornada pela API.
+        /// </summary>
+        private sealed class DadosPermissao
+        {
+            public int IdPermissao { get; set; }
+
+            public string Codigo { get; set; } = string.Empty;
+
+            public string Descricao { get; set; } = string.Empty;
+
+            public string Plataforma { get; set; } = string.Empty;
         }
     }
 }

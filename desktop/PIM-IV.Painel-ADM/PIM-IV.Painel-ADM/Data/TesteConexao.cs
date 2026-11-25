@@ -1,31 +1,59 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using System;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace PIM_IV.Painel_ADM.Data
 {
-    // Verifica a disponibilidade da conexão com o SQL Server.
+    // Verifica a disponibilidade do banco de dados por meio da API.
     internal static class TesteConexao
     {
-        // Retorna true quando a conexão é estabelecida.
+        // Mantém a compatibilidade com chamadas síncronas.
         public static bool Verificar()
+        {
+            return Task.Run(VerificarAsync)
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        // Consulta o estado da conexão entre a API e o banco.
+        public static async Task<bool> VerificarAsync()
         {
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.GetAsync("status-banco");
 
-                conexao.Open();
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    return false;
+                }
 
-                return conexao.State ==
-                    System.Data.ConnectionState.Open;
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
+
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                return documento.RootElement.TryGetProperty(
+                    "status",
+                    out JsonElement status)
+                    && status.GetString() == "conectado";
             }
-            catch (SqlException)
+            catch (HttpRequestException)
             {
-                // Retorna false quando ocorre um erro do SQL Server.
+                return false;
+            }
+            catch (TaskCanceledException)
+            {
+                return false;
+            }
+            catch (JsonException)
+            {
                 return false;
             }
             catch (InvalidOperationException)
             {
-                // Retorna false quando a conexão está inválida.
                 return false;
             }
         }

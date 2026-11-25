@@ -1,11 +1,13 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using System;
+using System.Data;
+using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Repositorios;
 using PIM_IV.Painel_ADM.Seguranca;
-using System;
-using System.Data;
-using System.Linq;
 
 namespace PIM_IV.Painel_ADM.Servicos
 {
@@ -20,41 +22,62 @@ namespace PIM_IV.Painel_ADM.Servicos
 
         private readonly UsuarioRepository _repositorio;
 
-        // Permite utilizar o repositório padrão.
+        // Inicializa o serviço com o repositório padrão.
         public UsuarioService()
             : this(new UsuarioRepository())
         {
         }
 
-        // Recebe o repositório utilizado pelo serviço.
+        // Permite receber uma instância do repositório.
         public UsuarioService(UsuarioRepository repositorio)
         {
             _repositorio = repositorio
                 ?? throw new ArgumentNullException(nameof(repositorio));
         }
 
-        // Verifica se já existe um administrador cadastrado.
+        // Verifica pela API se existe um administrador cadastrado.
         public bool ExisteAdministrador()
         {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                WHERE p.NomePerfil = N'Administrador'";
+            return Task.Run(async () =>
+            {
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.GetAsync(
+                        "inicializacao/status");
 
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
 
-            using SqlCommand comando = new(sql, conexao);
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
 
-            conexao.Open();
+                JsonElement resultado =
+                    documento.RootElement;
 
-            return Convert.ToInt32(
-                comando.ExecuteScalar()) > 0;
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    string mensagem =
+                        "Não foi possível verificar a inicialização.";
+
+                    if (resultado.TryGetProperty(
+                        "mensagem",
+                        out JsonElement mensagemApi))
+                    {
+                        mensagem =
+                            mensagemApi.GetString() ?? mensagem;
+                    }
+
+                    throw new InvalidOperationException(mensagem);
+                }
+
+                return resultado
+                    .GetProperty("administradorExiste")
+                    .GetBoolean();
+
+            }).GetAwaiter().GetResult();
         }
 
-        // Cadastra o primeiro administrador do sistema.
+        // Mantém a compatibilidade com o formulário de login.
+        // O provisionamento inicial deve ocorrer no servidor.
         public void CadastrarAdministradorInicial(
             string nomeCompleto,
             string login,
@@ -62,157 +85,19 @@ namespace PIM_IV.Painel_ADM.Servicos
         {
             ValidarDados(nomeCompleto, login, senha);
 
-            string nomeValidado = nomeCompleto.Trim();
-            string loginValidado = login.Trim();
-
-            string hash = SenhaHelper.GerarHash(senha);
-
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            conexao.Open();
-
-            using SqlTransaction transacao =
-                conexao.BeginTransaction(IsolationLevel.Serializable);
-
-            try
-            {
-                int idPerfil = ConsultarPerfilAdministrador(
-                    conexao,
-                    transacao);
-
-                VerificarAdministradorInicial(
-                    conexao,
-                    transacao,
-                    idPerfil);
-
-                InserirAdministradorInicial(
-                    conexao,
-                    transacao,
-                    nomeValidado,
-                    loginValidado,
-                    hash,
-                    idPerfil);
-
-                transacao.Commit();
-            }
-            catch
-            {
-                if (transacao.Connection != null)
-                {
-                    transacao.Rollback();
-                }
-
-                throw;
-            }
-        }
-
-        // Consulta o identificador do perfil Administrador.
-        private static int ConsultarPerfilAdministrador(
-            SqlConnection conexao,
-            SqlTransaction transacao)
-        {
-            const string sql = @"
-                SELECT IdPerfil
-                FROM dbo.Perfis
-                WHERE NomePerfil = N'Administrador'
-                  AND Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            object? resultado = comando.ExecuteScalar();
-
-            if (resultado == null || resultado == DBNull.Value)
-            {
-                throw new InvalidOperationException(
-                    "O perfil Administrador não foi encontrado.");
-            }
-
-            return Convert.ToInt32(resultado);
-        }
-
-        // Impede o cadastro duplicado do administrador inicial.
-        private static void VerificarAdministradorInicial(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idPerfil)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
-                WHERE IdPerfil = @IdPerfil";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = idPerfil;
-
-            bool administradorExiste =
-                Convert.ToInt32(comando.ExecuteScalar()) > 0;
-
-            if (administradorExiste)
+            if (ExisteAdministrador())
             {
                 throw new InvalidOperationException(
                     "O administrador inicial já foi cadastrado.");
             }
+
+            throw new InvalidOperationException(
+                "O administrador inicial deve ser provisionado " +
+                "no servidor por um responsável autorizado.");
         }
 
-        // Insere os dados do primeiro administrador.
-        private static void InserirAdministradorInicial(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string nomeCompleto,
-            string login,
-            string hash,
-            int idPerfil)
-        {
-            const string sql = @"
-                INSERT INTO dbo.Usuarios
-                (
-                    NomeCompleto,
-                    Login,
-                    SenhaHash,
-                    IdPerfil,
-                    Ativo
-                )
-                VALUES
-                (
-                    @Nome,
-                    @Login,
-                    @Hash,
-                    @IdPerfil,
-                    1
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Nome",
-                SqlDbType.NVarChar,
-                TamanhoMaximoNome).Value = nomeCompleto;
-
-            comando.Parameters.Add(
-                "@Login",
-                SqlDbType.NVarChar,
-                TamanhoMaximoLogin).Value = login;
-
-            comando.Parameters.Add(
-                "@Hash",
-                SqlDbType.NVarChar,
-                500).Value = hash;
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = idPerfil;
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Cadastra um usuário e retorna seu login definitivo.
+        // Cadastra um usuário pela API.
+        // Retorna o login definitivo gerado pelo servidor.
         public string CadastrarUsuario(
             Usuario administrador,
             string nomeCompleto,
@@ -225,12 +110,10 @@ namespace PIM_IV.Painel_ADM.Servicos
             ValidarNome(nomeCompleto);
             ValidarSenha(senha);
 
-            bool administradorNovo =
-                idPerfil == PerfilAdministrador;
-
-            if (administradorNovo)
+            // Apenas administradores possuem login manual.
+            if (idPerfil == PerfilAdministrador)
             {
-                ValidarNomeLogin(nomeCompleto, login);
+                ValidarLogin(login);
 
                 if (_repositorio.LoginExiste(login.Trim()))
                 {
@@ -242,31 +125,22 @@ namespace PIM_IV.Painel_ADM.Servicos
             Usuario novoUsuario = CriarUsuario(
                 nomeCompleto,
                 login,
-                senha,
                 idPerfil);
 
-            try
-            {
-                _repositorio.Cadastrar(
-                    novoUsuario,
-                    administrador.IdUsuario);
+            // A API gera o hash e o identificador sequencial.
+            _repositorio.Cadastrar(
+                novoUsuario,
+                administrador.IdUsuario,
+                senha);
 
-                return novoUsuario.Login;
-            }
-            catch (SqlException ex) when (LoginDuplicado(ex))
-            {
-                throw new ArgumentException(
-                    "O identificador já está cadastrado. " +
-                    "Verifique os dados e tente novamente.",
-                    ex);
-            }
+            // Retorna RA, RP, RC ou login manual.
+            return novoUsuario.Login;
         }
 
-        // Cria o objeto que será enviado ao repositório.
+        // Cria o objeto encaminhado ao repositório.
         private static Usuario CriarUsuario(
             string nomeCompleto,
             string login,
-            string senha,
             int idPerfil)
         {
             return new Usuario
@@ -277,15 +151,17 @@ namespace PIM_IV.Painel_ADM.Servicos
                     ? login.Trim()
                     : string.Empty,
 
-                SenhaHash = SenhaHelper.GerarHash(senha),
+                SenhaHash = string.Empty,
 
                 IdPerfil = idPerfil,
 
-                Ativo = true
+                Ativo = true,
+
+                DeveAlterarSenha = true
             };
         }
 
-        // Atualiza os dados cadastrais de um usuário.
+        // Atualiza os dados cadastrais pela API.
         public void EditarUsuario(
             Usuario administrador,
             int idUsuario,
@@ -297,24 +173,21 @@ namespace PIM_IV.Painel_ADM.Servicos
             ValidarNomeLogin(nomeCompleto, login);
             ValidarPerfil(idPerfil);
 
-            try
-            {
-                _repositorio.Editar(
-                    administrador.IdUsuario,
-                    idUsuario,
-                    nomeCompleto.Trim(),
-                    login.Trim(),
-                    idPerfil);
-            }
-            catch (SqlException ex) when (LoginDuplicado(ex))
+            if (idUsuario <= 0)
             {
                 throw new ArgumentException(
-                    "Este login já pertence a outro usuário.",
-                    ex);
+                    "Usuário inválido.");
             }
+
+            _repositorio.Editar(
+                administrador.IdUsuario,
+                idUsuario,
+                nomeCompleto.Trim(),
+                login.Trim(),
+                idPerfil);
         }
 
-        // Ativa ou desativa uma conta de usuário.
+        // Ativa ou desativa uma conta pela API.
         public void AlterarStatusUsuario(
             Usuario administrador,
             int idUsuario,
@@ -322,19 +195,26 @@ namespace PIM_IV.Painel_ADM.Servicos
         {
             ValidarAdministrador(administrador);
 
+            if (idUsuario <= 0)
+            {
+                throw new ArgumentException(
+                    "Usuário inválido.");
+            }
+
+            if (administrador.IdUsuario == idUsuario &&
+                !novoStatus)
+            {
+                throw new InvalidOperationException(
+                    "Você não pode desativar sua própria conta.");
+            }
+
             _repositorio.AlterarStatus(
                 administrador.IdUsuario,
                 idUsuario,
                 novoStatus);
         }
 
-        // Identifica violações de unicidade no SQL Server.
-        private static bool LoginDuplicado(SqlException ex)
-        {
-            return ex.Number == 2601 || ex.Number == 2627;
-        }
-
-        // Valida as regras obrigatórias de segurança da senha.
+        // Valida os requisitos obrigatórios da senha.
         public static void ValidarSenha(string senha)
         {
             if (string.IsNullOrEmpty(senha) ||
@@ -375,7 +255,7 @@ namespace PIM_IV.Painel_ADM.Servicos
             }
         }
 
-        // Verifica se o usuário da sessão é administrador.
+        // Verifica se o administrador possui uma sessão válida.
         private static void ValidarAdministrador(
             Usuario administrador)
         {
@@ -385,6 +265,12 @@ namespace PIM_IV.Painel_ADM.Servicos
             {
                 throw new UnauthorizedAccessException(
                     "Apenas administradores podem realizar esta operação.");
+            }
+
+            if (!SessaoUsuario.EstaAutenticado)
+            {
+                throw new UnauthorizedAccessException(
+                    "Sessão inválida. Realize o login novamente.");
             }
         }
 
@@ -404,7 +290,7 @@ namespace PIM_IV.Painel_ADM.Servicos
             }
         }
 
-        // Valida o nome completo do usuário.
+        // Valida o nome completo.
         private static void ValidarNome(string nomeCompleto)
         {
             if (string.IsNullOrWhiteSpace(nomeCompleto))

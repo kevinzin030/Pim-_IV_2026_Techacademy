@@ -2,7 +2,9 @@
 
 namespace PIM_IV.Painel_ADM.Modelos
 {
-    // Representa um usuário cadastrado no sistema acadêmico.
+    /// <summary>
+    /// Representa um usuário cadastrado no sistema acadêmico.
+    /// </summary>
     public class Usuario
     {
         // Identificador único do usuário.
@@ -14,7 +16,7 @@ namespace PIM_IV.Painel_ADM.Modelos
         // Identificador utilizado para acessar o sistema.
         public string Login { get; set; } = string.Empty;
 
-        // Armazena o hash da senha, nunca a senha original.
+        // Mantido temporariamente para compatibilidade com os serviços antigos.
         public string SenhaHash { get; set; } = string.Empty;
 
         // Identifica o perfil de acesso do usuário.
@@ -22,6 +24,9 @@ namespace PIM_IV.Painel_ADM.Modelos
 
         // Indica se o usuário pode acessar o sistema.
         public bool Ativo { get; set; }
+
+        // Indica se a alteração da senha é obrigatória.
+        public bool DeveAlterarSenha { get; set; }
 
         // Registra a data de criação da conta.
         public DateTime DataCadastro { get; set; }

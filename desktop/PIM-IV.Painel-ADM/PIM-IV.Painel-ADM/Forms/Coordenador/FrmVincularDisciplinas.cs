@@ -1,25 +1,35 @@
-﻿using Microsoft.Data.SqlClient;
-using PIM_IV.Painel_ADM.Data;
+﻿using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Servicos;
 using System;
 using System.Data;
 using System.Drawing;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
-    // Gerencia os vínculos entre turmas e disciplinas.
+    // Gerencia os vínculos entre turmas e disciplinas pela API.
     public class FrmVincularDisciplinas : Form
     {
         private const int PerfilCoordenador = 2;
-        private const string PermissaoDisciplinas = "GERENCIAR_DISCIPLINAS";
+
+        private const string PermissaoDisciplinas =
+            "GERENCIAR_DISCIPLINAS";
 
         private readonly Usuario _usuario;
+
         private readonly PermissaoService _permissaoService = new();
 
-        private readonly Color _azul = Color.FromArgb(40, 92, 170);
-        private readonly Color _fundo = Color.FromArgb(244, 247, 251);
+        private readonly Color _azul =
+            Color.FromArgb(40, 92, 170);
+
+        private readonly Color _fundo =
+            Color.FromArgb(244, 247, 251);
 
         private ComboBox cmbTurmas = null!;
         private ComboBox cmbDisciplinas = null!;
@@ -48,7 +58,7 @@ namespace PIM_IV.Painel_ADM.Forms
             Shown += AoExibirFormulario;
         }
 
-        // Define as dimensões adequadas para o notebook.
+        // Define as dimensões e a identidade visual.
         private void ConfigurarFormulario()
         {
             Text = "PIM IV - Vinculação de Disciplinas às Turmas";
@@ -62,7 +72,9 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Valida o acesso antes de carregar os dados.
-        private void AoExibirFormulario(object? sender, EventArgs e)
+        private void AoExibirFormulario(
+            object? sender,
+            EventArgs e)
         {
             if (!VerificarAcesso())
             {
@@ -73,7 +85,7 @@ namespace PIM_IV.Painel_ADM.Forms
             AtualizarDados();
         }
 
-        // Verifica se o coordenador possui a permissão necessária.
+        // Verifica a permissão do coordenador autenticado.
         private bool VerificarAcesso()
         {
             try
@@ -115,7 +127,7 @@ namespace PIM_IV.Painel_ADM.Forms
             CriarAreaBotoes(principal);
         }
 
-        // Cria a estrutura principal com espaçamentos reduzidos.
+        // Cria a estrutura principal do formulário.
         private TableLayoutPanel CriarLayoutPrincipal()
         {
             TableLayoutPanel principal = new()
@@ -428,6 +440,16 @@ namespace PIM_IV.Painel_ADM.Forms
                 }
             };
 
+            // Sincroniza a disciplina da lista com o ComboBox.
+            lstDisciplinas.SelectedIndexChanged += (_, _) =>
+            {
+                if (!_atualizandoDados &&
+                    lstDisciplinas.SelectedValue is int idDisciplina)
+                {
+                    cmbDisciplinas.SelectedValue = idDisciplina;
+                }
+            };
+
             btnAtualizar.Click += (_, _) =>
                 AtualizarDados();
 
@@ -445,23 +467,28 @@ namespace PIM_IV.Painel_ADM.Forms
             dgvVinculos.DragDrop += AoSoltarDisciplina;
         }
 
-        // Atualiza as turmas e disciplinas disponíveis.
+        // Atualiza as turmas e disciplinas disponíveis pela API.
         private void AtualizarDados()
         {
             int turmaAnterior = ObterIdSelecionado(cmbTurmas);
+
             bool dadosCarregados = false;
 
             try
             {
                 _atualizandoDados = true;
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Get,
+                    "vinculos/opcoes");
 
-                conexao.Open();
+                DataTable turmas = ConverterOpcoes(
+                    resposta.GetProperty("turmas"),
+                    "IdTurma");
 
-                DataTable turmas = ConsultarTurmas(conexao);
-                DataTable disciplinas = ConsultarDisciplinas(conexao);
+                DataTable disciplinas = ConverterOpcoes(
+                    resposta.GetProperty("disciplinas"),
+                    "IdDisciplina");
 
                 PreencherControles(
                     turmas,
@@ -485,50 +512,28 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // Consulta as turmas ativas.
-        private static DataTable ConsultarTurmas(
-            SqlConnection conexao)
+        // Converte as opções retornadas pela API em uma tabela.
+        private static DataTable ConverterOpcoes(
+            JsonElement registros,
+            string campoIdentificador)
         {
-            const string sql = @"
-                SELECT
-                    IdTurma,
-                    CodigoTurma + ' - ' + NomeTurma
-                        AS NomeExibicao
-                FROM dbo.Turmas
-                WHERE Ativa = 1
-                ORDER BY CodigoTurma";
-
-            return ConsultarTabela(conexao, sql);
-        }
-
-        // Consulta as disciplinas ativas.
-        private static DataTable ConsultarDisciplinas(
-            SqlConnection conexao)
-        {
-            const string sql = @"
-                SELECT
-                    IdDisciplina,
-                    CodigoDisciplina + ' - ' +
-                        NomeDisciplina AS NomeExibicao
-                FROM dbo.Disciplinas
-                WHERE Ativa = 1
-                ORDER BY CodigoDisciplina ASC";
-
-            return ConsultarTabela(conexao, sql);
-        }
-
-        // Executa uma consulta SQL e retorna uma tabela.
-        private static DataTable ConsultarTabela(
-            SqlConnection conexao,
-            string sql)
-        {
-            using SqlCommand comando = new(sql, conexao);
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
-
             DataTable tabela = new();
-            tabela.Load(leitor);
+
+            tabela.Columns.Add(
+                campoIdentificador,
+                typeof(int));
+
+            tabela.Columns.Add(
+                "NomeExibicao",
+                typeof(string));
+
+            foreach (JsonElement registro in registros.EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty(campoIdentificador).GetInt32(),
+                    registro.GetProperty("NomeExibicao").GetString()
+                        ?? string.Empty);
+            }
 
             return tabela;
         }
@@ -597,16 +602,9 @@ namespace PIM_IV.Painel_ADM.Forms
                 : 0;
         }
 
-        // Obtém a disciplina escolhida na lista ou no ComboBox.
+        // Obtém a disciplina selecionada.
         private int ObterDisciplinaSelecionada()
         {
-            if (lstDisciplinas.Focused &&
-                lstDisciplinas.SelectedItem is DataRowView disciplina)
-            {
-                return Convert.ToInt32(
-                    disciplina["IdDisciplina"]);
-            }
-
             return ObterIdSelecionado(cmbDisciplinas);
         }
 
@@ -629,43 +627,52 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
+                LimparTabelaVinculos();
+
                 MostrarErro("Erro ao consultar vínculos", ex);
             }
         }
 
-        // Consulta as disciplinas vinculadas à turma.
+        // Consulta as disciplinas vinculadas por meio da API.
         private static DataTable ConsultarVinculos(int idTurma)
         {
-            const string sql = @"
-                SELECT
-                    td.IdTurmaDisciplina,
-                    d.CodigoDisciplina AS Codigo,
-                    d.NomeDisciplina AS Disciplina,
-                    d.CargaHoraria AS CargaHoraria
-                FROM dbo.TurmaDisciplinas td
-                INNER JOIN dbo.Disciplinas d
-                    ON td.IdDisciplina = d.IdDisciplina
-                WHERE td.IdTurma = @IdTurma
-                  AND td.Ativa = 1
-                ORDER BY d.CodigoDisciplina ASC";
-
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            using SqlCommand comando =
-                new(sql, conexao);
-
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = idTurma;
-
-            conexao.Open();
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
+            JsonElement resposta = ExecutarApi(
+                HttpMethod.Get,
+                $"vinculos/turmas/{idTurma}");
 
             DataTable tabela = new();
-            tabela.Load(leitor);
+
+            tabela.Columns.Add(
+                "IdTurmaDisciplina",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "Codigo",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Disciplina",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "CargaHoraria",
+                typeof(int));
+
+            foreach (
+                JsonElement registro in
+                resposta.GetProperty("vinculos").EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty("IdTurmaDisciplina").GetInt32(),
+
+                    registro.GetProperty("Codigo").GetString()
+                        ?? string.Empty,
+
+                    registro.GetProperty("Disciplina").GetString()
+                        ?? string.Empty,
+
+                    registro.GetProperty("CargaHoraria").GetInt32());
+            }
 
             return tabela;
         }
@@ -718,6 +725,8 @@ namespace PIM_IV.Painel_ADM.Forms
                 int idDisciplina = Convert.ToInt32(
                     disciplina["IdDisciplina"]);
 
+                lstDisciplinas.SelectedIndex = indice;
+
                 lstDisciplinas.DoDragDrop(
                     idDisciplina,
                     DragDropEffects.Copy);
@@ -757,7 +766,7 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // Vincula uma disciplina à turma selecionada.
+        // Vincula uma disciplina à turma selecionada pela API.
         private void VincularDisciplina(int idDisciplina)
         {
             int idTurma = ObterIdSelecionado(cmbTurmas);
@@ -769,50 +778,30 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                int resultado = ExecutarTransacao(
-                    (conexao, transacao) =>
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Post,
+                    $"vinculos/turmas/{idTurma}",
+                    new
                     {
-                        ValidarTurmaEDisciplina(
-                            conexao,
-                            transacao,
-                            idTurma,
-                            idDisciplina);
-
-                        int resultadoVinculo = ExecutarVinculacao(
-                            conexao,
-                            transacao,
-                            idTurma,
-                            idDisciplina);
-
-                        if (resultadoVinculo == 1)
-                        {
-                            RegistrarAuditoria(
-                                conexao,
-                                transacao,
-                                "VINCULAR_DISCIPLINA",
-                                $"Disciplina {idDisciplina} " +
-                                $"vinculada à turma {idTurma}.");
-                        }
-
-                        return resultadoVinculo;
+                        idDisciplina
                     });
 
-                if (resultado == 0)
-                {
-                    ExibirMensagem(
-                        "Esta disciplina já está vinculada à turma.",
-                        "Vínculo existente",
-                        MessageBoxIcon.Information);
-
-                    return;
-                }
-
                 ExibirMensagem(
-                    "Disciplina vinculada com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Disciplina vinculada com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
                 CarregarVinculos();
+            }
+            catch (HttpRequestException ex)
+                when (ex.StatusCode == HttpStatusCode.Conflict)
+            {
+                ExibirMensagem(
+                    ex.Message,
+                    "Vínculo existente",
+                    MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -838,119 +827,7 @@ namespace PIM_IV.Painel_ADM.Forms
             return false;
         }
 
-        // Confirma se a turma e a disciplina estão ativas.
-        private static void ValidarTurmaEDisciplina(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idTurma,
-            int idDisciplina)
-        {
-            const string sql = @"
-                SELECT
-                    CASE WHEN EXISTS
-                    (
-                        SELECT 1
-                        FROM dbo.Turmas
-                        WHERE IdTurma = @IdTurma
-                          AND Ativa = 1
-                    )
-                    AND EXISTS
-                    (
-                        SELECT 1
-                        FROM dbo.Disciplinas
-                        WHERE IdDisciplina = @IdDisciplina
-                          AND Ativa = 1
-                    )
-                    THEN 1 ELSE 0 END";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            AdicionarIds(
-                comando,
-                idTurma,
-                idDisciplina);
-
-            bool dadosValidos =
-                Convert.ToInt32(comando.ExecuteScalar()) == 1;
-
-            if (!dadosValidos)
-            {
-                throw new InvalidOperationException(
-                    "A turma ou disciplina está inativa ou não existe.");
-            }
-        }
-
-        // Cria, reativa ou identifica um vínculo existente.
-        private static int ExecutarVinculacao(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idTurma,
-            int idDisciplina)
-        {
-            const string sql = @"
-                IF EXISTS
-                (
-                    SELECT 1
-                    FROM dbo.TurmaDisciplinas
-                        WITH (UPDLOCK, HOLDLOCK)
-                    WHERE IdTurma = @IdTurma
-                      AND IdDisciplina = @IdDisciplina
-                      AND Ativa = 1
-                )
-                BEGIN
-                    SELECT 0;
-                END
-                ELSE IF EXISTS
-                (
-                    SELECT 1
-                    FROM dbo.TurmaDisciplinas
-                        WITH (UPDLOCK, HOLDLOCK)
-                    WHERE IdTurma = @IdTurma
-                      AND IdDisciplina = @IdDisciplina
-                )
-                BEGIN
-                    UPDATE dbo.TurmaDisciplinas
-                    SET
-                        Ativa = 1,
-                        DataVinculo = SYSDATETIME()
-                    WHERE IdTurma = @IdTurma
-                      AND IdDisciplina = @IdDisciplina;
-
-                    SELECT 1;
-                END
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.TurmaDisciplinas
-                    (
-                        IdTurma,
-                        IdDisciplina,
-                        Ativa,
-                        DataVinculo
-                    )
-                    VALUES
-                    (
-                        @IdTurma,
-                        @IdDisciplina,
-                        1,
-                        SYSDATETIME()
-                    );
-
-                    SELECT 1;
-                END";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            AdicionarIds(
-                comando,
-                idTurma,
-                idDisciplina);
-
-            return Convert.ToInt32(comando.ExecuteScalar());
-        }
-
-        // Desativa o vínculo selecionado sem excluir seu histórico.
+        // Desativa o vínculo sem excluir seu histórico.
         private void DesvincularDisciplina()
         {
             if (!TentarObterVinculoSelecionado(
@@ -979,26 +856,14 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                ExecutarTransacao(
-                    (conexao, transacao) =>
-                    {
-                        DesativarVinculo(
-                            conexao,
-                            transacao,
-                            idVinculo,
-                            idTurma);
-
-                        RegistrarAuditoria(
-                            conexao,
-                            transacao,
-                            "DESVINCULAR_DISCIPLINA",
-                            $"Vínculo acadêmico {idVinculo} desativado.");
-
-                        return true;
-                    });
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Delete,
+                    $"vinculos/turmas/{idTurma}/{idVinculo}");
 
                 ExibirMensagem(
-                    "Disciplina desvinculada com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Disciplina desvinculada com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
@@ -1053,175 +918,75 @@ namespace PIM_IV.Painel_ADM.Forms
             return resposta == DialogResult.Yes;
         }
 
-        // Desativa um vínculo existente no banco de dados.
-        private static void DesativarVinculo(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idVinculo,
-            int idTurma)
+        // Executa requisições HTTP utilizando a sessão autenticada.
+        private static JsonElement ExecutarApi(
+            HttpMethod metodo,
+            string rota,
+            object? corpo = null)
         {
-            const string sql = @"
-                UPDATE dbo.TurmaDisciplinas
-                SET Ativa = 0
-                WHERE IdTurmaDisciplina = @IdVinculo
-                  AND IdTurma = @IdTurma
-                  AND Ativa = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdVinculo",
-                SqlDbType.Int).Value = idVinculo;
-
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = idTurma;
-
-            int registrosAlterados =
-                comando.ExecuteNonQuery();
-
-            if (registrosAlterados != 1)
+            return Task.Run(async () =>
             {
-                throw new InvalidOperationException(
-                    "O vínculo não está mais ativo.");
-            }
-        }
+                using HttpRequestMessage requisicao =
+                    new(metodo, rota);
 
-        // Executa a operação e a auditoria em uma transação.
-        private T ExecutarTransacao<T>(
-            Func<SqlConnection, SqlTransaction, T> operacao)
-        {
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            conexao.Open();
-
-            using SqlTransaction transacao =
-                conexao.BeginTransaction(IsolationLevel.Serializable);
-
-            try
-            {
-                ExigirAutorizacao(conexao, transacao);
-
-                T resultado = operacao(conexao, transacao);
-
-                transacao.Commit();
-
-                return resultado;
-            }
-            catch
-            {
-                if (transacao.Connection != null)
+                if (corpo != null)
                 {
-                    transacao.Rollback();
+                    requisicao.Content = JsonContent.Create(corpo);
                 }
 
-                throw;
-            }
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.SendAsync(requisicao);
+
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
+
+                JsonElement resultado;
+
+                try
+                {
+                    using JsonDocument documento =
+                        JsonDocument.Parse(conteudo);
+
+                    resultado = documento.RootElement.Clone();
+                }
+                catch (JsonException)
+                {
+                    throw new HttpRequestException(
+                        "A API retornou uma resposta inválida.",
+                        null,
+                        resposta.StatusCode);
+                }
+
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        ObterMensagem(
+                            resultado,
+                            "Não foi possível concluir a operação."),
+                        null,
+                        resposta.StatusCode);
+                }
+
+                return resultado;
+
+            }).GetAwaiter().GetResult();
         }
 
-        // Revalida a autorização diretamente no banco.
-        private void ExigirAutorizacao(
-            SqlConnection conexao,
-            SqlTransaction transacao)
+        // Obtém a mensagem retornada pela API.
+        private static string ObterMensagem(
+            JsonElement resposta,
+            string mensagemPadrao)
         {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                INNER JOIN dbo.PerfilPermissoes pp
-                    ON p.IdPerfil = pp.IdPerfil
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.IdPerfil = @IdPerfil
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND pm.Codigo = @CodigoPermissao
-                  AND pm.Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = PerfilCoordenador;
-
-            comando.Parameters.Add(
-                "@CodigoPermissao",
-                SqlDbType.VarChar,
-                100).Value = PermissaoDisciplinas;
-
-            bool autorizado =
-                Convert.ToInt32(comando.ExecuteScalar()) > 0;
-
-            if (!autorizado)
+            if (resposta.ValueKind == JsonValueKind.Object &&
+                resposta.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem) &&
+                mensagem.ValueKind == JsonValueKind.String)
             {
-                throw new UnauthorizedAccessException(
-                    "Você não possui autorização para esta operação.");
+                return mensagem.GetString() ?? mensagemPadrao;
             }
-        }
 
-        // Adiciona os identificadores utilizados nas consultas SQL.
-        private static void AdicionarIds(
-            SqlCommand comando,
-            int idTurma,
-            int idDisciplina)
-        {
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = idTurma;
-
-            comando.Parameters.Add(
-                "@IdDisciplina",
-                SqlDbType.Int).Value = idDisciplina;
-        }
-
-        // Registra a operação na mesma transação dos dados.
-        private void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string acao,
-            string descricao)
-        {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = acao;
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value = descricao;
-
-            comando.ExecuteNonQuery();
+            return mensagemPadrao;
         }
 
         // Exibe mensagens padronizadas.

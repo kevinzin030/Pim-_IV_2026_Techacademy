@@ -1,5 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
-using PIM_IV.Painel_ADM.Data;
+﻿using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Servicos;
 using System;
@@ -7,11 +6,17 @@ using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
-    // Gerencia os perfis de acesso e suas permissões no sistema.
+    /// <summary>
+    /// Gerencia os perfis e suas permissões através da API REST.
+    /// </summary>
     public class FrmControleAcessos : Form
     {
         private const int PerfilAdministrador = 1;
@@ -34,10 +39,18 @@ namespace PIM_IV.Painel_ADM.Forms
         private Label lblPlataforma = null!;
         private FlowLayoutPanel painelPermissoes = null!;
         private Button btnSalvar = null!;
+        private Button btnAtualizar = null!;
 
         private DataTable _perfis = new();
 
         private bool _carregando;
+        private bool _processando;
+
+        // Configura a interpretação das respostas JSON da API.
+        private static readonly JsonSerializerOptions OpcoesJson = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
 
         // Inicializa o formulário com o administrador autenticado.
         public FrmControleAcessos(Usuario administrador)
@@ -48,10 +61,10 @@ namespace PIM_IV.Painel_ADM.Forms
             ConfigurarFormulario();
             CriarInterface();
 
-            Shown += (_, _) => CarregarPerfis();
+            Shown += async (_, _) => await CarregarPerfisAsync();
         }
 
-        // Define a aparência inicial do formulário.
+        // Define a aparência original do formulário.
         private void ConfigurarFormulario()
         {
             Text = "Controle de Acessos";
@@ -62,7 +75,7 @@ namespace PIM_IV.Painel_ADM.Forms
             Font = new Font("Segoe UI", 10);
         }
 
-        // Organiza os controles visuais do gerenciamento de acessos.
+        // Organiza os componentes visuais do gerenciamento de acessos.
         private void CriarInterface()
         {
             TableLayoutPanel layout = CriarLayoutPrincipal();
@@ -87,7 +100,7 @@ namespace PIM_IV.Painel_ADM.Forms
             };
 
             cmbPerfil.SelectedIndexChanged +=
-                (_, _) => ExibirPerfilSelecionado();
+                async (_, _) => await ExibirPerfilSelecionadoAsync();
 
             layout.Controls.Add(cmbPerfil, 0, 2);
 
@@ -112,6 +125,8 @@ namespace PIM_IV.Painel_ADM.Forms
             layout.Controls.Add(painelPermissoes, 0, 7);
 
             layout.Controls.Add(CriarPainelBotoes(), 0, 8);
+
+            btnSalvar.Enabled = false;
         }
 
         // Cria a estrutura principal da interface.
@@ -200,14 +215,17 @@ namespace PIM_IV.Painel_ADM.Forms
                 _corPrincipal,
                 Color.White);
 
-            Button btnAtualizar = CriarBotao(
+            btnAtualizar = CriarBotao(
                 "Atualizar",
                 120,
                 SystemColors.Control,
                 Color.Black);
 
-            btnSalvar.Click += (_, _) => SalvarAlteracoes();
-            btnAtualizar.Click += (_, _) => CarregarPerfis();
+            btnSalvar.Click +=
+                async (_, _) => await SalvarAlteracoesAsync();
+
+            btnAtualizar.Click +=
+                async (_, _) => await CarregarPerfisAsync();
 
             painelBotoes.Controls.Add(btnSalvar);
             painelBotoes.Controls.Add(btnAtualizar);
@@ -227,7 +245,7 @@ namespace PIM_IV.Painel_ADM.Forms
             };
         }
 
-        // Cria botões reutilizáveis para as ações do formulário.
+        // Cria botões reutilizáveis.
         private static Button CriarBotao(
             string texto,
             int largura,
@@ -269,48 +287,97 @@ namespace PIM_IV.Painel_ADM.Forms
                        PermissaoGerenciarAcessos);
         }
 
-        // Consulta os perfis cadastrados no banco de dados.
-        private static DataTable ConsultarPerfis()
+        // Controla a disponibilidade da interface durante requisições.
+        private void DefinirProcessamento(
+            bool processando,
+            bool permitirSalvar = false)
         {
-            const string sql = @"
-                SELECT
-                    IdPerfil,
-                    NomePerfil,
-                    Descricao,
-                    Ativo
-                FROM dbo.Perfis
-                WHERE NomePerfil IN
-                (
-                    'Administrador',
-                    'Coordenador',
-                    'Professor',
-                    'Aluno'
-                )
-                ORDER BY IdPerfil";
+            _processando = processando;
 
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
+            UseWaitCursor = processando;
 
-            using SqlCommand comando = new(sql, conexao);
+            cmbPerfil.Enabled = !processando;
+            txtDescricao.Enabled = !processando;
+            painelPermissoes.Enabled = !processando;
+            btnAtualizar.Enabled = !processando;
 
-            conexao.Open();
+            btnSalvar.Enabled =
+                !processando && permitirSalvar;
 
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
+            string nomePerfil =
+                cmbPerfil.SelectedItem is DataRowView linha
+                    ? Convert.ToString(linha["NomePerfil"]) ?? ""
+                    : "";
 
+            chkAtivo.Enabled =
+                !processando &&
+                nomePerfil != NomeAdministrador;
+        }
+
+        // Consulta os perfis cadastrados através da API REST.
+        private static async Task<DataTable> ConsultarPerfisAsync()
+        {
+            using HttpResponseMessage resposta =
+                await ApiClient.Cliente.GetAsync("perfis");
+
+            string conteudo =
+                await resposta.Content.ReadAsStringAsync();
+
+            if (!resposta.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    ObterMensagemErro(conteudo));
+            }
+
+            RespostaPerfis? resultado =
+                JsonSerializer.Deserialize<RespostaPerfis>(
+                    conteudo,
+                    OpcoesJson);
+
+            if (resultado?.Perfis == null)
+            {
+                throw new InvalidOperationException(
+                    "A API retornou uma lista de perfis inválida.");
+            }
+
+            // Preserva a estrutura utilizada pelo ComboBox original.
             DataTable tabela = new();
 
-            tabela.Load(leitor);
+            tabela.Columns.Add("IdPerfil", typeof(int));
+            tabela.Columns.Add("NomePerfil", typeof(string));
+            tabela.Columns.Add("Descricao", typeof(string));
+            tabela.Columns.Add("Ativo", typeof(bool));
+
+            foreach (DadosPerfil perfil in resultado.Perfis)
+            {
+                tabela.Rows.Add(
+                    perfil.IdPerfil,
+                    perfil.NomePerfil,
+                    perfil.Descricao,
+                    perfil.Ativo);
+            }
 
             return tabela;
         }
 
-        // Atualiza a lista de perfis disponíveis.
-        private void CarregarPerfis()
+        // Atualiza a lista de perfis sem bloquear a interface.
+        private async Task CarregarPerfisAsync()
         {
+            if (_processando)
+            {
+                return;
+            }
+
+            bool carregamentoConcluido = false;
+
             try
             {
-                if (!AdministradorPossuiPermissao())
+                DefinirProcessamento(true);
+
+                bool autorizado = await Task.Run(
+                    AdministradorPossuiPermissao);
+
+                if (!autorizado)
                 {
                     ExibirMensagem(
                         "Você não possui permissão para gerenciar acessos.",
@@ -321,20 +388,37 @@ namespace PIM_IV.Painel_ADM.Forms
                     return;
                 }
 
-                DataTable tabela = ConsultarPerfis();
+                DataTable tabela = await ConsultarPerfisAsync();
+
+                if (IsDisposed || Disposing)
+                {
+                    return;
+                }
 
                 AtualizarListaPerfis(tabela);
 
-                ExibirPerfilSelecionado();
+                carregamentoConcluido = true;
             }
             catch (Exception ex)
             {
-                _carregando = false;
-
                 ExibirMensagem(
                     "Erro ao carregar perfis:\n" + ex.Message,
                     "Erro",
                     MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (!IsDisposed && !Disposing)
+                {
+                    DefinirProcessamento(false);
+                }
+            }
+
+            if (carregamentoConcluido &&
+                !IsDisposed &&
+                !Disposing)
+            {
+                await ExibirPerfilSelecionadoAsync();
             }
         }
 
@@ -359,16 +443,21 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Exibe os dados e as permissões do perfil selecionado.
-        private void ExibirPerfilSelecionado()
+        private async Task ExibirPerfilSelecionadoAsync()
         {
             if (_carregando ||
+                _processando ||
                 cmbPerfil.SelectedItem is not DataRowView linha)
             {
                 return;
             }
 
+            bool permissoesCarregadas = false;
+
             try
             {
+                DefinirProcessamento(true);
+
                 int idPerfil =
                     Convert.ToInt32(linha["IdPerfil"]);
 
@@ -381,14 +470,14 @@ namespace PIM_IV.Painel_ADM.Forms
                 chkAtivo.Checked =
                     Convert.ToBoolean(linha["Ativo"]);
 
-                // O Administrador não pode ser desativado.
-                chkAtivo.Enabled =
-                    nomePerfil != NomeAdministrador;
-
                 lblPlataforma.Text =
                     "Plataforma: " + PlataformaDoPerfil(nomePerfil);
 
-                CarregarPermissoes(idPerfil, nomePerfil);
+                await CarregarPermissoesAsync(
+                    idPerfil,
+                    nomePerfil);
+
+                permissoesCarregadas = true;
             }
             catch (Exception ex)
             {
@@ -397,20 +486,54 @@ namespace PIM_IV.Painel_ADM.Forms
                     "Erro",
                     MessageBoxIcon.Error);
             }
+            finally
+            {
+                if (!IsDisposed && !Disposing)
+                {
+                    DefinirProcessamento(
+                        false,
+                        permissoesCarregadas);
+                }
+            }
         }
 
         // Consulta e apresenta as permissões do perfil selecionado.
-        private void CarregarPermissoes(
+        private async Task CarregarPermissoesAsync(
             int idPerfil,
             string nomePerfil)
         {
-            painelPermissoes.Controls.Clear();
+            // Remove e libera os componentes da seleção anterior.
+            while (painelPermissoes.Controls.Count > 0)
+            {
+                Control controle =
+                    painelPermissoes.Controls[0];
 
-            DataTable todasPermissoes =
-                _permissaoService.ListarPermissoes();
+                painelPermissoes.Controls.Remove(controle);
+
+                controle.Dispose();
+            }
+
+            // Executa as consultas fora da thread da interface.
+            Task<DataTable> consultaTodas = Task.Run(
+                () => _permissaoService.ListarPermissoes());
+
+            Task<DataTable> consultaAtribuidas = Task.Run(
+                () => _permissaoService.ListarPermissoesDoPerfil(
+                    idPerfil));
+
+            await Task.WhenAll(
+                consultaTodas,
+                consultaAtribuidas);
+
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            DataTable todasPermissoes = await consultaTodas;
 
             DataTable permissoesAtribuidas =
-                _permissaoService.ListarPermissoesDoPerfil(idPerfil);
+                await consultaAtribuidas;
 
             HashSet<int> idsAtribuidos = permissoesAtribuidas
                 .AsEnumerable()
@@ -420,6 +543,7 @@ namespace PIM_IV.Painel_ADM.Forms
             string plataformaPermitida =
                 PlataformaDoPerfil(nomePerfil);
 
+            // Apresenta somente permissões da plataforma correspondente.
             foreach (DataRow linha in todasPermissoes.Rows)
             {
                 int idPermissao =
@@ -453,7 +577,7 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // Cria o CheckBox de cada permissão.
+        // Cria o CheckBox correspondente a cada permissão.
         private static CheckBox CriarCheckBoxPermissao(
             int idPermissao,
             string codigo,
@@ -470,11 +594,12 @@ namespace PIM_IV.Painel_ADM.Forms
                 Margin = new Padding(5, 7, 5, 7)
             };
 
-            // O Administrador deve manter a permissão de gerenciar acessos.
-            if (nomePerfil == NomeAdministrador &&
-                codigo == PermissaoGerenciarAcessos)
+            // Garante que o administrador mantenha o gerenciamento de acessos.
+            if (codigo == PermissaoGerenciarAcessos)
             {
-                chkPermissao.Checked = true;
+                chkPermissao.Checked =
+                    nomePerfil == NomeAdministrador;
+
                 chkPermissao.Enabled = false;
             }
 
@@ -492,14 +617,17 @@ namespace PIM_IV.Painel_ADM.Forms
                     chkPermissao.Checked &&
                     chkPermissao.Tag is PermissaoItem item)
                 {
-                    permissoesSelecionadas.Add(item.IdPermissao);
+                    permissoesSelecionadas.Add(
+                        item.IdPermissao);
                 }
             }
 
-            return permissoesSelecionadas;
+            return permissoesSelecionadas
+                .Distinct()
+                .ToList();
         }
 
-        // Valida os dados antes de iniciar a gravação.
+        // Valida os dados antes de solicitar a atualização.
         private bool ValidarDadosPerfil(
             string nomePerfil,
             string descricao,
@@ -517,6 +645,16 @@ namespace PIM_IV.Painel_ADM.Forms
                 return false;
             }
 
+            if (descricao.Length > 200)
+            {
+                ExibirMensagem(
+                    "A descrição deve possuir até 200 caracteres.",
+                    "Validação",
+                    MessageBoxIcon.Warning);
+
+                return false;
+            }
+
             if (nomePerfil == NomeAdministrador && !ativo)
             {
                 ExibirMensagem(
@@ -530,10 +668,12 @@ namespace PIM_IV.Painel_ADM.Forms
             return true;
         }
 
-        // Confirma e executa a atualização do perfil selecionado.
-        private void SalvarAlteracoes()
+        // Confirma e solicita a atualização do perfil selecionado.
+        private async Task SalvarAlteracoesAsync()
         {
-            if (cmbPerfil.SelectedItem is not DataRowView linha)
+            if (_processando ||
+                !btnSalvar.Enabled ||
+                cmbPerfil.SelectedItem is not DataRowView linha)
             {
                 return;
             }
@@ -545,9 +685,13 @@ namespace PIM_IV.Painel_ADM.Forms
                 Convert.ToString(linha["NomePerfil"]) ?? "";
 
             string descricao = txtDescricao.Text.Trim();
+
             bool ativo = chkAtivo.Checked;
 
-            if (!ValidarDadosPerfil(nomePerfil, descricao, ativo))
+            if (!ValidarDadosPerfil(
+                nomePerfil,
+                descricao,
+                ativo))
             {
                 return;
             }
@@ -566,23 +710,24 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
+            bool atualizacaoConcluida = false;
+
             try
             {
-                btnSalvar.Enabled = false;
+                DefinirProcessamento(true);
 
-                ExecutarAtualizacaoPerfil(
+                await ExecutarAtualizacaoPerfilAsync(
                     idPerfil,
-                    nomePerfil,
                     descricao,
                     ativo,
                     permissoesSelecionadas);
+
+                atualizacaoConcluida = true;
 
                 ExibirMensagem(
                     "Permissões atualizadas com sucesso!",
                     "Sucesso",
                     MessageBoxIcon.Information);
-
-                CarregarPerfis();
             }
             catch (Exception ex)
             {
@@ -593,455 +738,79 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             finally
             {
-                btnSalvar.Enabled = true;
+                if (!IsDisposed && !Disposing)
+                {
+                    DefinirProcessamento(
+                        false,
+                        !atualizacaoConcluida);
+                }
+            }
+
+            if (atualizacaoConcluida &&
+                !IsDisposed &&
+                !Disposing)
+            {
+                await CarregarPerfisAsync();
             }
         }
 
-        // Executa todas as alterações dentro de uma transação SQL.
-        private void ExecutarAtualizacaoPerfil(
+        /// <summary>
+        /// Envia os dados do perfil para a API.
+        /// A transação, autorização e auditoria são executadas no servidor.
+        /// </summary>
+        private static async Task ExecutarAtualizacaoPerfilAsync(
             int idPerfil,
-            string nomePerfil,
             string descricao,
             bool ativo,
             List<int> permissoesSelecionadas)
         {
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
+            // Prepara os dados esperados pelo PerfilController.
+            var dadosAtualizacao = new
+            {
+                descricao,
+                ativo,
+                permissoes = permissoesSelecionadas
+            };
 
-            conexao.Open();
+            // Envia a atualização utilizando a sessão JWT.
+            using HttpResponseMessage resposta =
+                await ApiClient.Cliente.PutAsJsonAsync(
+                    $"perfis/{idPerfil}",
+                    dadosAtualizacao);
 
-            using SqlTransaction transacao =
-                conexao.BeginTransaction(
-                    IsolationLevel.Serializable);
+            string conteudo =
+                await resposta.Content.ReadAsStringAsync();
 
+            // Apresenta as validações retornadas pelo servidor.
+            if (!resposta.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    ObterMensagemErro(conteudo));
+            }
+        }
+
+        // Extrai a mensagem de erro retornada pela API.
+        private static string ObterMensagemErro(string conteudo)
+        {
             try
             {
-                ValidarAdministradorNoBanco(
-                    conexao,
-                    transacao);
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
 
-                string nomePerfilBanco =
-                    ValidarPerfilNoBanco(
-                        conexao,
-                        transacao,
-                        idPerfil,
-                        nomePerfil,
-                        ativo);
-
-                string plataformaPermitida =
-                    PlataformaDoPerfil(nomePerfilBanco);
-
-                Dictionary<int, (string Codigo, string Plataforma)>
-                    permissoesValidas =
-                        ConsultarPermissoesValidas(
-                            conexao,
-                            transacao);
-
-                ValidarPermissoesSelecionadas(
-                    permissoesSelecionadas,
-                    permissoesValidas,
-                    nomePerfilBanco,
-                    plataformaPermitida);
-
-                GarantirPermissaoAdministrativa(
-                    permissoesSelecionadas,
-                    permissoesValidas,
-                    nomePerfilBanco);
-
-                AtualizarPerfilNoBanco(
-                    conexao,
-                    transacao,
-                    idPerfil,
-                    descricao,
-                    ativo);
-
-                AtualizarPermissoesDoPerfil(
-                    conexao,
-                    transacao,
-                    idPerfil,
-                    plataformaPermitida,
-                    permissoesSelecionadas);
-
-                RegistrarAuditoria(
-                    conexao,
-                    transacao,
-                    idPerfil,
-                    nomePerfilBanco,
-                    plataformaPermitida,
-                    permissoesSelecionadas,
-                    ativo);
-
-                transacao.Commit();
-            }
-            catch
-            {
-                // Desfaz as alterações caso alguma operação falhe.
-                if (transacao.Connection != null)
+                if (documento.RootElement.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem))
                 {
-                    transacao.Rollback();
-                }
-
-                throw;
-            }
-        }
-
-        // Confirma a autorização do administrador diretamente no banco.
-        private void ValidarAdministradorNoBanco(
-            SqlConnection conexao,
-            SqlTransaction transacao)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                INNER JOIN dbo.PerfilPermissoes pp
-                    ON p.IdPerfil = pp.IdPerfil
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND p.NomePerfil = 'Administrador'
-                  AND pm.Codigo = 'GERENCIAR_ACESSOS'
-                  AND pm.Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _administrador.IdUsuario;
-
-            if (Convert.ToInt32(comando.ExecuteScalar()) == 0)
-            {
-                throw new InvalidOperationException(
-                    "Administrador sem autorização para alterar permissões.");
-            }
-        }
-
-        // Bloqueia o perfil e verifica se ele ainda pode ser alterado.
-        private static string ValidarPerfilNoBanco(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idPerfil,
-            string nomePerfil,
-            bool ativo)
-        {
-            const string sqlPerfil = @"
-                SELECT NomePerfil
-                FROM dbo.Perfis WITH (UPDLOCK, HOLDLOCK)
-                WHERE IdPerfil = @IdPerfil";
-
-            string nomePerfilBanco;
-
-            using (SqlCommand comando = new(
-                sqlPerfil,
-                conexao,
-                transacao))
-            {
-                comando.Parameters.Add(
-                    "@IdPerfil",
-                    SqlDbType.Int).Value = idPerfil;
-
-                nomePerfilBanco =
-                    Convert.ToString(comando.ExecuteScalar()) ?? "";
-            }
-
-            if (nomePerfilBanco != nomePerfil)
-            {
-                throw new InvalidOperationException(
-                    "O perfil selecionado foi alterado. Atualize a tela.");
-            }
-
-            if (nomePerfilBanco == NomeAdministrador && !ativo)
-            {
-                throw new InvalidOperationException(
-                    "O Administrador não pode ser desativado.");
-            }
-
-            if (!ativo)
-            {
-                ValidarPerfilSemUsuarios(
-                    conexao,
-                    transacao,
-                    idPerfil);
-            }
-
-            return nomePerfilBanco;
-        }
-
-        // Impede a desativação de perfis que possuem usuários vinculados.
-        private static void ValidarPerfilSemUsuarios(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idPerfil)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios
-                WHERE IdPerfil = @IdPerfil";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = idPerfil;
-
-            if (Convert.ToInt32(comando.ExecuteScalar()) > 0)
-            {
-                throw new InvalidOperationException(
-                    "Não é possível desativar um perfil que possui usuários vinculados.");
-            }
-        }
-
-        // Consulta as permissões ativas para validar os vínculos.
-        private static Dictionary<int, (string Codigo, string Plataforma)>
-            ConsultarPermissoesValidas(
-                SqlConnection conexao,
-                SqlTransaction transacao)
-        {
-            const string sql = @"
-                SELECT IdPermissao, Codigo, Plataforma
-                FROM dbo.Permissoes WITH (HOLDLOCK)
-                WHERE Ativo = 1";
-
-            Dictionary<int, (string Codigo, string Plataforma)>
-                permissoesValidas = new();
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
-
-            while (leitor.Read())
-            {
-                int idPermissao = leitor.GetInt32(0);
-
-                permissoesValidas[idPermissao] = (
-                    leitor.GetString(1),
-                    leitor.GetString(2)
-                );
-            }
-
-            return permissoesValidas;
-        }
-
-        // Impede a atribuição de permissões inválidas ou incompatíveis.
-        private static void ValidarPermissoesSelecionadas(
-            List<int> permissoesSelecionadas,
-            Dictionary<int, (string Codigo, string Plataforma)> permissoesValidas,
-            string nomePerfil,
-            string plataformaPermitida)
-        {
-            foreach (int idPermissao in permissoesSelecionadas)
-            {
-                if (!permissoesValidas.TryGetValue(
-                    idPermissao,
-                    out var permissao))
-                {
-                    throw new InvalidOperationException(
-                        "Uma das permissões selecionadas não está mais disponível.");
-                }
-
-                if (!string.Equals(
-                    permissao.Plataforma,
-                    plataformaPermitida,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        "Foi identificada uma permissão incompatível " +
-                        "com a plataforma do perfil.");
-                }
-
-                if (permissao.Codigo == PermissaoGerenciarAcessos &&
-                    nomePerfil != NomeAdministrador)
-                {
-                    throw new InvalidOperationException(
-                        "A permissão de gerenciamento de acessos " +
-                        "é exclusiva do Administrador.");
+                    return mensagem.GetString()
+                        ?? "Não foi possível concluir a operação.";
                 }
             }
-        }
-
-        // Garante que o Administrador mantenha a permissão de gerenciar acessos.
-        private static void GarantirPermissaoAdministrativa(
-            List<int> permissoesSelecionadas,
-            Dictionary<int, (string Codigo, string Plataforma)> permissoesValidas,
-            string nomePerfil)
-        {
-            if (nomePerfil != NomeAdministrador)
+            catch (JsonException)
             {
-                return;
+                // Utiliza a mensagem padrão para respostas inválidas.
             }
 
-            int? idGerenciarAcessos = permissoesValidas
-                .Where(permissao =>
-                    permissao.Value.Codigo == PermissaoGerenciarAcessos &&
-                    string.Equals(
-                        permissao.Value.Plataforma,
-                        PlataformaDesktop,
-                        StringComparison.OrdinalIgnoreCase))
-                .Select(permissao => (int?)permissao.Key)
-                .FirstOrDefault();
-
-            if (idGerenciarAcessos == null)
-            {
-                throw new InvalidOperationException(
-                    "A permissão GERENCIAR_ACESSOS não está disponível no banco.");
-            }
-
-            if (!permissoesSelecionadas.Contains(idGerenciarAcessos.Value))
-            {
-                permissoesSelecionadas.Add(idGerenciarAcessos.Value);
-            }
-        }
-
-        // Atualiza a descrição e a situação do perfil.
-        private static void AtualizarPerfilNoBanco(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idPerfil,
-            string descricao,
-            bool ativo)
-        {
-            const string sql = @"
-                UPDATE dbo.Perfis
-                SET
-                    Descricao = @Descricao,
-                    Ativo = @Ativo
-                WHERE IdPerfil = @IdPerfil";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                200).Value = descricao;
-
-            comando.Parameters.Add(
-                "@Ativo",
-                SqlDbType.Bit).Value = ativo;
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = idPerfil;
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Substitui apenas as permissões da plataforma correspondente.
-        private static void AtualizarPermissoesDoPerfil(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idPerfil,
-            string plataformaPermitida,
-            List<int> permissoesSelecionadas)
-        {
-            const string sqlExcluir = @"
-                DELETE pp
-                FROM dbo.PerfilPermissoes pp
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE pp.IdPerfil = @IdPerfil
-                  AND pm.Plataforma = @Plataforma";
-
-            using (SqlCommand comando = new(
-                sqlExcluir,
-                conexao,
-                transacao))
-            {
-                comando.Parameters.Add(
-                    "@IdPerfil",
-                    SqlDbType.Int).Value = idPerfil;
-
-                comando.Parameters.Add(
-                    "@Plataforma",
-                    SqlDbType.NVarChar,
-                    50).Value = plataformaPermitida;
-
-                comando.ExecuteNonQuery();
-            }
-
-            const string sqlInserir = @"
-                INSERT INTO dbo.PerfilPermissoes
-                (
-                    IdPerfil,
-                    IdPermissao
-                )
-                VALUES
-                (
-                    @IdPerfil,
-                    @IdPermissao
-                )";
-
-            foreach (int idPermissao in permissoesSelecionadas.Distinct())
-            {
-                using SqlCommand comando =
-                    new(sqlInserir, conexao, transacao);
-
-                comando.Parameters.Add(
-                    "@IdPerfil",
-                    SqlDbType.Int).Value = idPerfil;
-
-                comando.Parameters.Add(
-                    "@IdPermissao",
-                    SqlDbType.Int).Value = idPermissao;
-
-                comando.ExecuteNonQuery();
-            }
-        }
-
-        // Registra as alterações de acesso para fins de auditoria.
-        private void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idPerfil,
-            string nomePerfil,
-            string plataformaPermitida,
-            List<int> permissoesSelecionadas,
-            bool ativo)
-        {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _administrador.IdUsuario;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = "ALTERACAO_PERMISSOES";
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value =
-                    $"Alterou o perfil {nomePerfil} (ID {idPerfil}). " +
-                    $"Plataforma: {plataformaPermitida}. " +
-                    $"Permissões selecionadas: " +
-                    $"{permissoesSelecionadas.Distinct().Count()}. " +
-                    $"Ativo: {ativo}.";
-
-            comando.ExecuteNonQuery();
+            return "Não foi possível concluir a operação.";
         }
 
         // Exibe mensagens padronizadas ao usuário.
@@ -1070,6 +839,24 @@ namespace PIM_IV.Painel_ADM.Forms
                 IdPermissao = idPermissao;
                 Codigo = codigo;
             }
+        }
+
+        // Representa a resposta de listagem de perfis da API.
+        private sealed class RespostaPerfis
+        {
+            public DadosPerfil[]? Perfis { get; set; }
+        }
+
+        // Representa os dados cadastrais de um perfil.
+        private sealed class DadosPerfil
+        {
+            public int IdPerfil { get; set; }
+
+            public string NomePerfil { get; set; } = "";
+
+            public string Descricao { get; set; } = "";
+
+            public bool Ativo { get; set; }
         }
     }
 }

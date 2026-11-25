@@ -1,4 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Servicos;
@@ -34,13 +37,13 @@ namespace PIM_IV.Painel_ADM.Forms
         private Button btnNovo = null!;
         private Button btnStatus = null!;
 
-        // Identifica a turma em edição. Null indica um novo cadastro.
+        // Identifica a turma em edição.
         private int? _idTurmaSelecionada;
 
-        // Impede que a seleção da tabela seja processada durante o carregamento.
+        // Controla os eventos durante o carregamento.
         private bool _carregando;
 
-        // Inicializa o formulário e verifica o acesso quando ele é exibido.
+        // Inicializa o formulário com o usuário autenticado.
         public FrmGerenciarTurmas(Usuario usuario)
         {
             _usuario = usuario ??
@@ -68,7 +71,7 @@ namespace PIM_IV.Painel_ADM.Forms
             };
         }
 
-        // Confirma se o usuário é coordenador e possui a permissão necessária.
+        // Confirma se o coordenador possui a permissão necessária.
         private bool VerificarAcesso()
         {
             try
@@ -93,7 +96,10 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao verificar autorização", ex);
+                MostrarErro(
+                    "Erro ao verificar autorização",
+                    ex);
+
                 return false;
             }
         }
@@ -133,9 +139,12 @@ namespace PIM_IV.Painel_ADM.Forms
                     "Segoe UI",
                     21,
                     FontStyle.Bold),
+
                 ForeColor = _azul,
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft
+
+                TextAlign =
+                    ContentAlignment.MiddleLeft
             };
 
             principal.Controls.Add(titulo, 0, 0);
@@ -148,15 +157,19 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Text = "Turmas encontradas: 0",
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft,
+
+                TextAlign =
+                    ContentAlignment.MiddleLeft,
+
                 ForeColor = Color.DimGray
             };
 
             principal.Controls.Add(lblQuantidade, 0, 4);
         }
 
-        // Cria os campos e botões utilizados no cadastro de turmas.
-        private void CriarAreaCadastro(TableLayoutPanel principal)
+        // Cria os campos e botões utilizados no cadastro.
+        private void CriarAreaCadastro(
+            TableLayoutPanel principal)
         {
             Panel painel = new()
             {
@@ -205,8 +218,9 @@ namespace PIM_IV.Painel_ADM.Forms
             CriarBotoesCadastro(campos);
         }
 
-        // Cria os campos de identificação e período letivo da turma.
-        private void CriarCamposIdentificacao(TableLayoutPanel campos)
+        // Cria os campos de identificação e período letivo.
+        private void CriarCamposIdentificacao(
+            TableLayoutPanel campos)
         {
             campos.Controls.Add(
                 CriarRotulo("Código da turma"), 0, 0);
@@ -243,11 +257,20 @@ namespace PIM_IV.Painel_ADM.Forms
             cmbSemestre = new ComboBox
             {
                 Dock = DockStyle.Fill,
-                DropDownStyle = ComboBoxStyle.DropDownList
+
+                DropDownStyle =
+                    ComboBoxStyle.DropDownList
             };
 
+            // Disponibiliza os quatro semestres do curso.
             cmbSemestre.Items.AddRange(
-                new object[] { "1", "2" });
+                new object[]
+                {
+        "1",
+        "2",
+        "3",
+        "4"
+                });
 
             cmbSemestre.SelectedIndex = 0;
 
@@ -258,12 +281,16 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria a seleção do período e o indicador de edição.
-        private void CriarCampoPeriodo(TableLayoutPanel campos)
+        private void CriarCampoPeriodo(
+            TableLayoutPanel campos)
         {
             FlowLayoutPanel painelPeriodo = new()
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
+
+                FlowDirection =
+                    FlowDirection.LeftToRight,
+
                 WrapContents = false,
                 AutoScroll = true
             };
@@ -278,7 +305,10 @@ namespace PIM_IV.Painel_ADM.Forms
             cmbPeriodo = new ComboBox
             {
                 Width = 190,
-                DropDownStyle = ComboBoxStyle.DropDownList,
+
+                DropDownStyle =
+                    ComboBoxStyle.DropDownList,
+
                 Margin = new Padding(0, 8, 15, 0)
             };
 
@@ -297,11 +327,14 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Text = "Novo cadastro",
                 AutoSize = true,
+
                 Font = new Font(
                     "Segoe UI",
                     10,
                     FontStyle.Bold),
+
                 ForeColor = _azul,
+
                 Margin = new Padding(12, 12, 0, 0)
             };
 
@@ -313,13 +346,17 @@ namespace PIM_IV.Painel_ADM.Forms
             campos.SetColumnSpan(painelPeriodo, 4);
         }
 
-        // Cria os botões de salvar, limpar e alterar a situação.
-        private void CriarBotoesCadastro(TableLayoutPanel campos)
+        // Cria os botões de gerenciamento.
+        private void CriarBotoesCadastro(
+            TableLayoutPanel campos)
         {
             FlowLayoutPanel botoes = new()
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.RightToLeft,
+
+                FlowDirection =
+                    FlowDirection.RightToLeft,
+
                 WrapContents = false
             };
 
@@ -332,9 +369,14 @@ namespace PIM_IV.Painel_ADM.Forms
             btnStatus = CriarBotao(
                 "Ativar / Desativar", 170, false);
 
-            btnSalvar.Click += (_, _) => SalvarTurma();
-            btnNovo.Click += (_, _) => LimparFormulario();
-            btnStatus.Click += (_, _) => AlterarStatus();
+            btnSalvar.Click += (_, _) =>
+                SalvarTurma();
+
+            btnNovo.Click += (_, _) =>
+                LimparFormulario();
+
+            btnStatus.Click += (_, _) =>
+                AlterarStatus();
 
             botoes.Controls.Add(btnSalvar);
             botoes.Controls.Add(btnNovo);
@@ -345,26 +387,33 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria a pesquisa por código, nome ou período.
-        private void CriarAreaPesquisa(TableLayoutPanel principal)
+        private void CriarAreaPesquisa(
+            TableLayoutPanel principal)
         {
             FlowLayoutPanel painel = new()
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
+
+                FlowDirection =
+                    FlowDirection.LeftToRight,
+
                 WrapContents = false,
                 AutoScroll = true,
+
                 Padding = new Padding(0, 5, 0, 0)
             };
 
             txtPesquisa = new TextBox
             {
                 Width = 370,
+
                 PlaceholderText =
                     "Pesquisar por código, nome ou período...",
+
                 Margin = new Padding(0, 4, 12, 0)
             };
 
-            // Permite executar a pesquisa pressionando Enter.
+            // Permite pesquisar pressionando Enter.
             txtPesquisa.KeyDown += (_, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -397,20 +446,26 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria e configura a tabela de turmas.
-        private void CriarTabela(TableLayoutPanel principal)
+        private void CriarTabela(
+            TableLayoutPanel principal)
         {
             dgvTurmas = new DataGridView
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
+
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
                 AllowUserToResizeRows = false,
+
                 MultiSelect = false,
+
                 SelectionMode =
                     DataGridViewSelectionMode.FullRowSelect,
+
                 AutoSizeColumnsMode =
                     DataGridViewAutoSizeColumnsMode.Fill,
+
                 BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
                 RowHeadersVisible = false
@@ -445,11 +500,14 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Text = texto,
                 Dock = DockStyle.Fill,
+
                 Font = new Font(
                     "Segoe UI",
                     9,
                     FontStyle.Bold),
-                ForeColor = Color.FromArgb(40, 50, 65)
+
+                ForeColor =
+                    Color.FromArgb(40, 50, 65)
             };
         }
 
@@ -464,20 +522,30 @@ namespace PIM_IV.Painel_ADM.Forms
                 Text = texto,
                 Width = largura,
                 Height = 38,
+
                 Margin = new Padding(5, 0, 0, 0),
+
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                BackColor = principal ? _azul : Color.White,
-                ForeColor = principal ? Color.White : _azul
+
+                BackColor = principal
+                    ? _azul
+                    : Color.White,
+
+                ForeColor = principal
+                    ? Color.White
+                    : _azul
             };
 
             botao.FlatAppearance.BorderColor = _azul;
-            botao.FlatAppearance.BorderSize = principal ? 0 : 1;
+
+            botao.FlatAppearance.BorderSize =
+                principal ? 0 : 1;
 
             return botao;
         }
 
-        // Consulta as turmas e aplica o filtro de pesquisa informado.
+        // Consulta as turmas por meio da API.
         private void CarregarTurmas()
         {
             if (!VerificarAcesso())
@@ -487,57 +555,17 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                const string sql = @"
-                    SELECT
-                        IdTurma,
-                        CodigoTurma,
-                        NomeTurma,
-                        Periodo,
-                        AnoLetivo,
-                        Semestre,
-                        Ativa
-                    FROM dbo.Turmas
-                    WHERE
-                        @Pesquisa = ''
-                        OR CodigoTurma LIKE @Texto
-                        OR NomeTurma LIKE @Texto
-                        OR Periodo LIKE @Texto
-                    ORDER BY
-                        CodigoTurma ASC";
+                DataTable tabela = ConsultarRegistros();
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
-
-                using SqlCommand comando =
-                    new(sql, conexao);
-
-                string pesquisa = txtPesquisa.Text.Trim();
-
-                comando.Parameters.Add(
-                    "@Pesquisa",
-                    SqlDbType.NVarChar,
-                    100).Value = pesquisa;
-
-                comando.Parameters.Add(
-                    "@Texto",
-                    SqlDbType.NVarChar,
-                    210).Value = "%" + pesquisa + "%";
-
-                conexao.Open();
-
-                using SqlDataReader leitor =
-                    comando.ExecuteReader();
-
-                DataTable tabela = new();
-                tabela.Load(leitor);
-
-                // Suspende os eventos enquanto a tabela recebe os resultados.
+                // Suspende os eventos durante a atualização.
                 _carregando = true;
 
                 try
                 {
                     dgvTurmas.DataSource = tabela;
+
                     ConfigurarColunas();
+
                     dgvTurmas.ClearSelection();
                 }
                 finally
@@ -545,32 +573,60 @@ namespace PIM_IV.Painel_ADM.Forms
                     _carregando = false;
                 }
 
+                LimparFormulario();
+
                 lblQuantidade.Text =
                     $"Turmas encontradas: {tabela.Rows.Count}";
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao carregar turmas", ex);
+                MostrarErro(
+                    "Erro ao carregar turmas",
+                    ex);
             }
         }
 
-        // Configura os títulos e as proporções das colunas.
+        // Configura os títulos e a proporção das colunas.
         private void ConfigurarColunas()
         {
             if (dgvTurmas.Columns.Contains("IdTurma"))
             {
-                dgvTurmas.Columns["IdTurma"]!.Visible = false;
+                dgvTurmas.Columns["IdTurma"]!.Visible =
+                    false;
             }
 
-            DefinirColuna("CodigoTurma", "Código", 90);
-            DefinirColuna("NomeTurma", "Nome da turma", 190);
-            DefinirColuna("Periodo", "Período", 100);
-            DefinirColuna("AnoLetivo", "Ano letivo", 85);
-            DefinirColuna("Semestre", "Semestre", 75);
-            DefinirColuna("Ativa", "Ativa", 65);
+            DefinirColuna(
+                "CodigoTurma",
+                "Código",
+                100);
+
+            DefinirColuna(
+                "NomeTurma",
+                "Nome da turma",
+                200);
+
+            DefinirColuna(
+                "Periodo",
+                "Período",
+                110);
+
+            DefinirColuna(
+                "AnoLetivo",
+                "Ano letivo",
+                85);
+
+            DefinirColuna(
+                "Semestre",
+                "Semestre",
+                85);
+
+            DefinirColuna(
+                "Ativa",
+                "Ativa",
+                60);
         }
 
-        // Define a apresentação de uma coluna existente.
+        // Configura uma coluna existente na tabela.
         private void DefinirColuna(
             string nome,
             string titulo,
@@ -616,7 +672,7 @@ namespace PIM_IV.Painel_ADM.Forms
             string periodo = Convert.ToString(
                 linha.Cells["Periodo"].Value) ?? "";
 
-            // Mantém compatibilidade com períodos já registrados no banco.
+            // Mantém compatibilidade com períodos existentes.
             if (!cmbPeriodo.Items.Contains(periodo))
             {
                 cmbPeriodo.Items.Add(periodo);
@@ -642,7 +698,7 @@ namespace PIM_IV.Painel_ADM.Forms
             btnStatus.Enabled = true;
         }
 
-        // Restaura os campos para o cadastro de uma nova turma.
+        // Restaura os campos para um novo cadastro.
         private void LimparFormulario()
         {
             _idTurmaSelecionada = null;
@@ -652,6 +708,7 @@ namespace PIM_IV.Painel_ADM.Forms
 
             cmbPeriodo.SelectedIndex = 0;
             cmbSemestre.SelectedIndex = 0;
+
             nudAno.Value = DateTime.Today.Year;
 
             lblModo.Text = "Novo cadastro";
@@ -659,23 +716,36 @@ namespace PIM_IV.Painel_ADM.Forms
             btnStatus.Enabled = false;
 
             dgvTurmas.ClearSelection();
+
             txtCodigo.Focus();
         }
 
-        // Valida os campos obrigatórios antes de salvar.
+        // Valida os campos obrigatórios.
         private bool ValidarFormulario()
         {
             if (string.IsNullOrWhiteSpace(txtCodigo.Text))
             {
-                MessageBox.Show("Informe o código da turma.");
+                MessageBox.Show(
+                    "Informe o código da turma.",
+                    "Validação",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
                 txtCodigo.Focus();
+
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(txtNome.Text))
             {
-                MessageBox.Show("Informe o nome da turma.");
+                MessageBox.Show(
+                    "Informe o nome da turma.",
+                    "Validação",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
                 txtNome.Focus();
+
                 return false;
             }
 
@@ -683,7 +753,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 cmbSemestre.SelectedItem == null)
             {
                 MessageBox.Show(
-                    "Selecione o período e o semestre.");
+                    "Selecione o período e o semestre.",
+                    "Validação",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
 
                 return false;
             }
@@ -691,7 +764,7 @@ namespace PIM_IV.Painel_ADM.Forms
             return true;
         }
 
-        // Cadastra uma nova turma ou atualiza a turma selecionada.
+        // Cadastra ou atualiza uma turma por meio da API.
         private void SalvarTurma()
         {
             if (!ValidarFormulario() || !VerificarAcesso())
@@ -710,7 +783,8 @@ namespace PIM_IV.Painel_ADM.Forms
             int semestre = int.Parse(
                 cmbSemestre.SelectedItem!.ToString()!);
 
-            bool editando = _idTurmaSelecionada.HasValue;
+            bool editando =
+                _idTurmaSelecionada.HasValue;
 
             string mensagem = editando
                 ? "Deseja salvar as alterações desta turma?"
@@ -727,68 +801,32 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                // A API realiza a validação e a auditoria.
+                string rota = editando
+                    ? $"academico/turmas/{_idTurmaSelecionada.Value}"
+                    : "academico/turmas";
 
-                conexao.Open();
+                ExecutarApi(
+                    editando
+                        ? HttpMethod.Put
+                        : HttpMethod.Post,
 
-                // Mantém validação, gravação e auditoria na mesma transação.
-                using SqlTransaction transacao =
-                    conexao.BeginTransaction(
-                        IsolationLevel.Serializable);
+                    rota,
 
-                try
-                {
-                    ExigirAutorizacao(conexao, transacao);
-
-                    ValidarCodigoDisponivel(
-                        conexao,
-                        transacao,
-                        codigo,
-                        _idTurmaSelecionada);
-
-                    ValidarNomeDisponivel(
-                        conexao,
-                        transacao,
-                        nome,
-                        _idTurmaSelecionada);
-
-                    int idRegistrado = GravarTurma(
-                        conexao,
-                        transacao,
-                        _idTurmaSelecionada,
+                    new
+                    {
                         codigo,
                         nome,
                         periodo,
-                        ano,
-                        semestre);
-
-                    RegistrarAuditoria(
-                        conexao,
-                        transacao,
-                        editando
-                            ? "ALTERACAO_TURMA"
-                            : "CADASTRO_TURMA",
-                        $"{(editando ? "Alterou" : "Cadastrou")} " +
-                        $"a turma {codigo} - {nome} " +
-                        $"(ID {idRegistrado}).");
-
-                    transacao.Commit();
-                }
-                catch
-                {
-                    if (transacao.Connection != null)
-                    {
-                        transacao.Rollback();
-                    }
-
-                    throw;
-                }
+                        anoLetivo = ano,
+                        semestre
+                    });
 
                 MessageBox.Show(
                     editando
                         ? "Turma atualizada com sucesso!"
                         : "Turma cadastrada com sucesso!",
+
                     "Sucesso",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -796,179 +834,32 @@ namespace PIM_IV.Painel_ADM.Forms
                 CarregarTurmas();
                 LimparFormulario();
             }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Validação",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao salvar turma", ex);
+                MostrarErro(
+                    "Erro ao salvar turma",
+                    ex);
             }
         }
 
-        // Impede o cadastro de turmas com códigos já utilizados.
-        private static void ValidarCodigoDisponivel(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string codigo,
-            int? idTurma)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Turmas WITH (UPDLOCK, HOLDLOCK)
-                WHERE CodigoTurma = @Codigo
-                  AND IdTurma <> @IdTurma";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Codigo",
-                SqlDbType.NVarChar,
-                30).Value = codigo;
-
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = idTurma ?? -1;
-
-            int quantidade =
-                Convert.ToInt32(comando.ExecuteScalar());
-
-            if (quantidade > 0)
-            {
-                throw new InvalidOperationException(
-                    "Já existe uma turma com esse código.");
-            }
-        }
-
-        // Impede nomes de turma repetidos, inclusive durante a edição.
-        private static void ValidarNomeDisponivel(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string nome,
-            int? idTurma)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Turmas WITH (UPDLOCK, HOLDLOCK)
-                WHERE UPPER(LTRIM(RTRIM(NomeTurma))) =
-                      UPPER(LTRIM(RTRIM(@Nome)))
-                  AND IdTurma <> @IdTurma";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Nome",
-                SqlDbType.NVarChar,
-                100).Value = nome;
-
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = idTurma ?? -1;
-
-            int quantidade =
-                Convert.ToInt32(comando.ExecuteScalar());
-
-            if (quantidade > 0)
-            {
-                throw new InvalidOperationException(
-                    "Já existe uma turma cadastrada com esse nome.");
-            }
-        }
-
-        // Grava os dados e retorna o identificador da turma.
-        private static int GravarTurma(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int? idTurma,
-            string codigo,
-            string nome,
-            string periodo,
-            int ano,
-            int semestre)
-        {
-            bool editando = idTurma.HasValue;
-
-            // OUTPUT retorna o ID do registro inserido ou atualizado.
-            string sql = editando
-                ? @"
-                    UPDATE dbo.Turmas
-                    SET CodigoTurma = @Codigo,
-                        NomeTurma = @Nome,
-                        Periodo = @Periodo,
-                        AnoLetivo = @Ano,
-                        Semestre = @Semestre
-                    OUTPUT inserted.IdTurma
-                    WHERE IdTurma = @IdTurma"
-                : @"
-                    INSERT INTO dbo.Turmas
-                    (
-                        CodigoTurma,
-                        NomeTurma,
-                        Periodo,
-                        AnoLetivo,
-                        Semestre,
-                        Ativa
-                    )
-                    OUTPUT inserted.IdTurma
-                    VALUES
-                    (
-                        @Codigo,
-                        @Nome,
-                        @Periodo,
-                        @Ano,
-                        @Semestre,
-                        1
-                    )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Codigo",
-                SqlDbType.NVarChar,
-                30).Value = codigo;
-
-            comando.Parameters.Add(
-                "@Nome",
-                SqlDbType.NVarChar,
-                100).Value = nome;
-
-            comando.Parameters.Add(
-                "@Periodo",
-                SqlDbType.NVarChar,
-                30).Value = periodo;
-
-            comando.Parameters.Add(
-                "@Ano",
-                SqlDbType.Int).Value = ano;
-
-            comando.Parameters.Add(
-                "@Semestre",
-                SqlDbType.Int).Value = semestre;
-
-            if (editando)
-            {
-                comando.Parameters.Add(
-                    "@IdTurma",
-                    SqlDbType.Int).Value = idTurma!.Value;
-            }
-
-            object? resultado = comando.ExecuteScalar();
-
-            if (resultado == null || resultado == DBNull.Value)
-            {
-                throw new InvalidOperationException(
-                    "Não foi possível salvar a turma.");
-            }
-
-            return Convert.ToInt32(resultado);
-        }
-
-        // Alterna a situação da turma sem excluir seu registro.
+        // Alterna a situação da turma sem excluir o registro.
         private void AlterarStatus()
         {
             if (!_idTurmaSelecionada.HasValue)
             {
                 MessageBox.Show(
-                    "Selecione uma turma na tabela.");
+                    "Selecione uma turma na tabela.",
+                    "Validação",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
 
                 return;
             }
@@ -978,7 +869,8 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
-            int idTurma = _idTurmaSelecionada.Value;
+            int idTurma =
+                _idTurmaSelecionada.Value;
 
             if (MessageBox.Show(
                 "Deseja alterar a situação desta turma?",
@@ -991,64 +883,32 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                // Consulta o status atual da turma.
+                DataTable registros =
+                    ConsultarRegistros(false);
 
-                conexao.Open();
+                DataRow? registro =
+                    registros.Rows.Find(idTurma);
 
-                using SqlTransaction transacao =
-                    conexao.BeginTransaction();
-
-                try
+                if (registro == null)
                 {
-                    ExigirAutorizacao(conexao, transacao);
-
-                    const string sql = @"
-                        UPDATE dbo.Turmas
-                        SET Ativa =
-                            CASE WHEN Ativa = 1 THEN 0 ELSE 1 END
-                        OUTPUT inserted.Ativa
-                        WHERE IdTurma = @IdTurma";
-
-                    using SqlCommand comando =
-                        new(sql, conexao, transacao);
-
-                    comando.Parameters.Add(
-                        "@IdTurma",
-                        SqlDbType.Int).Value = idTurma;
-
-                    object? resultado = comando.ExecuteScalar();
-
-                    if (resultado == null ||
-                        resultado == DBNull.Value)
-                    {
-                        throw new InvalidOperationException(
-                            "Turma não encontrada.");
-                    }
-
-                    bool novoStatus =
-                        Convert.ToBoolean(resultado);
-
-                    RegistrarAuditoria(
-                        conexao,
-                        transacao,
-                        "ALTERACAO_STATUS_TURMA",
-                        $"Turma ID {idTurma} " +
-                        (novoStatus
-                            ? "ativada."
-                            : "desativada."));
-
-                    transacao.Commit();
+                    throw new InvalidOperationException(
+                        "Registro não encontrado.");
                 }
-                catch
-                {
-                    if (transacao.Connection != null)
-                    {
-                        transacao.Rollback();
-                    }
 
-                    throw;
-                }
+                bool ativa =
+                    !Convert.ToBoolean(registro["Ativa"]);
+
+                // Solicita a alteração de status pela API.
+                ExecutarApi(
+                    HttpMethod.Patch,
+
+                    $"academico/turmas/{idTurma}/status",
+
+                    new
+                    {
+                        ativa
+                    });
 
                 MessageBox.Show(
                     "Situação da turma atualizada!",
@@ -1061,88 +921,10 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao alterar situação", ex);
+                MostrarErro(
+                    "Erro ao alterar situação",
+                    ex);
             }
-        }
-
-        // Revalida a autorização no banco antes de alterar os dados.
-        private void ExigirAutorizacao(
-            SqlConnection conexao,
-            SqlTransaction transacao)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                INNER JOIN dbo.PerfilPermissoes pp
-                    ON p.IdPerfil = pp.IdPerfil
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND p.NomePerfil = 'Coordenador'
-                  AND pm.Codigo = 'GERENCIAR_TURMAS'
-                  AND pm.Ativo = 1
-                  AND pm.Plataforma = 'Desktop'";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            bool autorizado =
-                Convert.ToInt32(comando.ExecuteScalar()) > 0;
-
-            if (!autorizado)
-            {
-                throw new UnauthorizedAccessException(
-                    "Você não possui autorização para gerenciar turmas.");
-            }
-        }
-
-        // Registra a operação na mesma transação dos dados acadêmicos.
-        private void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string acao,
-            string descricao)
-        {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = acao;
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value = descricao;
-
-            comando.ExecuteNonQuery();
         }
 
         // Exibe mensagens de erro padronizadas.
@@ -1155,6 +937,167 @@ namespace PIM_IV.Painel_ADM.Forms
                 titulo,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+        }
+
+        // Executa requisições autenticadas na API.
+        private static JsonElement ExecutarApi(
+            HttpMethod metodo,
+            string rota,
+            object? dados = null)
+        {
+            return Task.Run(async () =>
+            {
+                using HttpRequestMessage requisicao =
+                    new(metodo, rota);
+
+                if (dados != null)
+                {
+                    requisicao.Content =
+                        JsonContent.Create(dados);
+                }
+
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.SendAsync(
+                        requisicao);
+
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
+
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                // Apresenta a mensagem retornada pela API.
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        documento.RootElement.TryGetProperty(
+                            "mensagem",
+                            out JsonElement mensagem)
+
+                            ? mensagem.GetString()
+
+                            : "Não foi possível concluir a operação.");
+                }
+
+                return documento.RootElement.Clone();
+
+            }).GetAwaiter().GetResult();
+        }
+
+        // Converte os registros JSON para a tabela de turmas.
+        private DataTable ConsultarRegistros(
+            bool filtrar = true)
+        {
+            string pesquisa = filtrar
+                ? txtPesquisa.Text.Trim()
+                : string.Empty;
+
+            JsonElement resposta = ExecutarApi(
+                HttpMethod.Get,
+                "academico/turmas");
+
+            DataTable tabela = new();
+
+            tabela.Columns.Add(
+                "IdTurma",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "CodigoTurma",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "NomeTurma",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Periodo",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "AnoLetivo",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "Semestre",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "Ativa",
+                typeof(bool));
+
+            tabela.PrimaryKey = new[]
+            {
+                tabela.Columns["IdTurma"]!
+            };
+
+            // Preenche a tabela com os registros da API.
+            foreach (JsonElement registro in
+                resposta.GetProperty("registros").EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty(
+                        "IdTurma").GetInt32(),
+
+                    registro.GetProperty(
+                        "CodigoTurma").GetString(),
+
+                    registro.GetProperty(
+                        "NomeTurma").GetString(),
+
+                    registro.GetProperty(
+                        "Periodo").GetString(),
+
+                    registro.GetProperty(
+                        "AnoLetivo").GetInt32(),
+
+                    registro.GetProperty(
+                        "Semestre").GetInt32(),
+
+                    registro.GetProperty(
+                        "Ativa").GetBoolean());
+            }
+
+            // Aplica a pesquisa e ordena as turmas pelo código.
+            DataTable filtrada = tabela.Clone();
+
+            foreach (DataRow linha in
+                tabela.Select("", "CodigoTurma ASC"))
+            {
+                string codigo =
+                    Convert.ToString(
+                        linha["CodigoTurma"]) ?? "";
+
+                string nome =
+                    Convert.ToString(
+                        linha["NomeTurma"]) ?? "";
+
+                string periodo =
+                    Convert.ToString(
+                        linha["Periodo"]) ?? "";
+
+                bool correspondePesquisa =
+                    string.IsNullOrEmpty(pesquisa) ||
+
+                    codigo.Contains(
+                        pesquisa,
+                        StringComparison.OrdinalIgnoreCase) ||
+
+                    nome.Contains(
+                        pesquisa,
+                        StringComparison.OrdinalIgnoreCase) ||
+
+                    periodo.Contains(
+                        pesquisa,
+                        StringComparison.OrdinalIgnoreCase);
+
+                if (correspondePesquisa)
+                {
+                    filtrada.ImportRow(linha);
+                }
+            }
+
+            return filtrada;
         }
     }
 }

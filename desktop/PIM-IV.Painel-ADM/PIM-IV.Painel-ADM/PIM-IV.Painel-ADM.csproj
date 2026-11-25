@@ -15,8 +15,4 @@
     <None Remove="TechAcademy - API\**" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
-  </ItemGroup>
-
 </Project>

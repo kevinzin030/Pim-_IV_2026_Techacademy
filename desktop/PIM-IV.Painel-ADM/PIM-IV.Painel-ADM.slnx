@@ -1,30 +1,3 @@
 <Solution>
-  <Folder Name="/TechAcademy - API/">
-    <File Path="../../TechAcademy - API/Src/server.js" />
-    <File Path=".gitignore" />
-    <File Path="package-lock.json" />
-    <File Path="package.json" />
-  </Folder>
-  <Folder Name="/TechAcademy - API/Prisma/" />
-  <Folder Name="/TechAcademy - API/Src/" />
-  <Folder Name="/TechAcademy - API/Src/config/">
-    <File Path="../../TechAcademy - API/Src/Config/database.js" />
-  </Folder>
-  <Folder Name="/TechAcademy - API/Src/Controllers/">
-    <File Path="../../TechAcademy - API/Src/Controllers/AlunoController.js" />
-    <File Path="../../TechAcademy - API/Src/Controllers/AuthController.js" />
-    <File Path="../../TechAcademy - API/Src/Controllers/DisciplinaController.js" />
-    <File Path="../../TechAcademy - API/Src/Controllers/ProfessorController.js" />
-    <File Path="../../TechAcademy - API/Src/Controllers/TurmaController.js" />
-  </Folder>
-  <Folder Name="/TechAcademy - API/Src/Middlewares/">
-    <File Path="../../TechAcademy - API/Src/middlewares/autenticarToken.js" />
-  </Folder>
-  <Folder Name="/TechAcademy - API/Src/Routes/">
-    <File Path="../../TechAcademy - API/Src/Routes/index.js" />
-  </Folder>
-  <Folder Name="/TechAcademy - API/Src/Utils/">
-    <File Path="../../TechAcademy - API/Src/Utils/senhaHelper.js" />
-  </Folder>
   <Project Path="PIM-IV.Painel-ADM/PIM-IV.Painel-ADM.csproj" />
 </Solution>

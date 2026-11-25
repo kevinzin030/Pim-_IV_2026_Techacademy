@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Data;
 using System.Drawing;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using Microsoft.Data.SqlClient;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Servicos;
@@ -13,18 +16,18 @@ namespace PIM_IV.Painel_ADM.Forms
     public class FrmGerenciarMatriculas : Form
     {
         private const int PerfilCoordenador = 2;
-        private const string PermissaoGerenciarMatriculas = "GERENCIAR_MATRICULAS";
 
-        private const string SituacaoAtiva = "Ativa";
-        private const string SituacaoTrancada = "Trancada";
-        private const string SituacaoConcluida = "Concluida";
-        private const string SituacaoCancelada = "Cancelada";
+        private const string PermissaoGerenciarMatriculas =
+            "GERENCIAR_MATRICULAS";
 
         private readonly Usuario _usuario;
         private readonly PermissaoService _permissaoService = new();
 
-        private readonly Color _corAzul = Color.FromArgb(40, 92, 170);
-        private readonly Color _corFundo = Color.FromArgb(244, 247, 251);
+        private readonly Color _corAzul =
+            Color.FromArgb(40, 92, 170);
+
+        private readonly Color _corFundo =
+            Color.FromArgb(244, 247, 251);
 
         private ComboBox cmbAluno = null!;
         private ComboBox cmbTurma = null!;
@@ -46,6 +49,11 @@ namespace PIM_IV.Painel_ADM.Forms
 
         private bool _carregando;
 
+        private readonly System.Windows.Forms.Timer _timerPesquisa = new()
+        {
+            Interval = 450
+        };
+
         // Inicializa o formulário com o usuário autenticado.
         public FrmGerenciarMatriculas(Usuario usuario)
         {
@@ -61,7 +69,6 @@ namespace PIM_IV.Painel_ADM.Forms
         private void ConfigurarFormulario()
         {
             Text = "PIM IV - Gerenciamento de Matrículas";
-
             StartPosition = FormStartPosition.CenterParent;
 
             Size = new Size(1200, 800);
@@ -82,22 +89,45 @@ namespace PIM_IV.Painel_ADM.Forms
 
             btnAtualizar.Click += (_, _) => AtualizarDados();
 
-            txtPesquisa.TextChanged += (_, _) => CarregarMatriculas();
+            txtPesquisa.TextChanged += (_, _) =>
+            {
+                if (!_carregando)
+                {
+                    _timerPesquisa.Stop();
+                    _timerPesquisa.Start();
+                }
+            };
+
+            _timerPesquisa.Tick += (_, _) =>
+            {
+                _timerPesquisa.Stop();
+                CarregarMatriculas();
+            };
 
             cmbFiltroTurma.SelectedIndexChanged += (_, _) =>
             {
                 if (!_carregando)
                 {
+                    _timerPesquisa.Stop();
                     CarregarMatriculas();
                 }
             };
 
             dgvMatriculas.SelectionChanged += (_, _) =>
                 SelecionarMatricula();
+
+            FormClosed += (_, _) =>
+            {
+                _timerPesquisa.Stop();
+                _timerPesquisa.Dispose();
+                menuAcoes.Dispose();
+            };
         }
 
         // Valida o acesso antes de carregar as informações.
-        private void AoExibirFormulario(object? sender, EventArgs e)
+        private void AoExibirFormulario(
+            object? sender,
+            EventArgs e)
         {
             if (!VerificarAcesso())
             {
@@ -142,9 +172,9 @@ namespace PIM_IV.Painel_ADM.Forms
             TableLayoutPanel principal = new()
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20),
                 ColumnCount = 1,
                 RowCount = 6,
+                Padding = new Padding(20),
                 BackColor = _corFundo
             };
 
@@ -158,10 +188,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 new RowStyle(SizeType.Absolute, 115));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 70));
+                new RowStyle(SizeType.Absolute, 65));
 
             principal.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 75));
+                new RowStyle(SizeType.Absolute, 65));
 
             principal.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
@@ -175,7 +205,10 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Text = "Gerenciamento de Matrículas",
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 20, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    21,
+                    FontStyle.Bold),
                 ForeColor = _corAzul,
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -190,7 +223,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria os campos de aluno, turma e situação.
-        private void CriarAreaCadastro(TableLayoutPanel principal)
+        private void CriarAreaCadastro(
+            TableLayoutPanel principal)
         {
             TableLayoutPanel cadastro = new()
             {
@@ -199,17 +233,17 @@ namespace PIM_IV.Painel_ADM.Forms
                 RowCount = 2,
                 Padding = new Padding(15),
                 BackColor = Color.White,
-                Margin = new Padding(0, 0, 0, 8)
+                Margin = new Padding(0, 0, 0, 10)
             };
 
             cadastro.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Percent, 35));
+                new ColumnStyle(SizeType.Percent, 40));
 
             cadastro.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Percent, 35));
+                new ColumnStyle(SizeType.Percent, 40));
 
             cadastro.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Percent, 30));
+                new ColumnStyle(SizeType.Percent, 20));
 
             cadastro.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, 30));
@@ -232,13 +266,13 @@ namespace PIM_IV.Painel_ADM.Forms
 
             cmbSituacao.Items.AddRange(new object[]
             {
-                SituacaoAtiva,
-                SituacaoTrancada,
-                SituacaoConcluida,
-                SituacaoCancelada
+                "Ativa",
+                "Trancada",
+                "Concluida",
+                "Cancelada"
             });
 
-            cmbSituacao.SelectedItem = SituacaoAtiva;
+            cmbSituacao.SelectedItem = "Ativa";
 
             cadastro.Controls.Add(cmbAluno, 0, 1);
             cadastro.Controls.Add(cmbTurma, 1, 1);
@@ -247,27 +281,12 @@ namespace PIM_IV.Painel_ADM.Forms
             principal.Controls.Add(cadastro, 0, 1);
         }
 
-        // Cria o campo utilizado para pesquisar matrículas.
-        private void CriarAreaPesquisa(TableLayoutPanel principal)
+        // Cria o painel de pesquisa.
+        private void CriarAreaPesquisa(
+            TableLayoutPanel principal)
         {
-            TableLayoutPanel pesquisa = new()
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 2,
-                RowCount = 1,
-                Padding = new Padding(15, 12, 15, 10),
-                BackColor = Color.White,
-                Margin = new Padding(0, 0, 0, 10)
-            };
-
-            pesquisa.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Absolute, 90));
-
-            pesquisa.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Percent, 100));
-
-            pesquisa.RowStyles.Add(
-                new RowStyle(SizeType.Percent, 100));
+            TableLayoutPanel pesquisa =
+                CriarPainelHorizontal(100);
 
             pesquisa.Controls.Add(
                 CriarRotulo("Pesquisar:"), 0, 0);
@@ -275,9 +294,10 @@ namespace PIM_IV.Painel_ADM.Forms
             txtPesquisa = new TextBox
             {
                 Dock = DockStyle.Fill,
+                MaxLength = 150,
                 PlaceholderText =
-                    "Digite o nome, RA ou código da turma...",
-                Margin = new Padding(5, 3, 0, 3)
+                    "Pesquisar por nome, RA ou turma...",
+                Margin = new Padding(5, 5, 0, 0)
             };
 
             pesquisa.Controls.Add(txtPesquisa, 1, 0);
@@ -285,52 +305,61 @@ namespace PIM_IV.Painel_ADM.Forms
             principal.Controls.Add(pesquisa, 0, 2);
         }
 
-        // Cria o filtro de matrículas por turma.
-        private void CriarAreaFiltroTurma(TableLayoutPanel principal)
+        // Cria o filtro independente por turma.
+        private void CriarAreaFiltroTurma(
+            TableLayoutPanel principal)
         {
-            TableLayoutPanel filtro = new()
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 2,
-                RowCount = 1,
-                Padding = new Padding(15, 12, 15, 10),
-                BackColor = Color.White,
-                Margin = new Padding(0, 0, 0, 10)
-            };
-
-            filtro.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Absolute, 155));
-
-            filtro.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Percent, 100));
-
-            filtro.RowStyles.Add(
-                new RowStyle(SizeType.Percent, 100));
+            TableLayoutPanel filtro =
+                CriarPainelHorizontal(155);
 
             filtro.Controls.Add(
                 CriarRotulo("Filtrar por turma:"), 0, 0);
 
             cmbFiltroTurma = CriarCombo();
 
-            cmbFiltroTurma.Margin =
-                new Padding(5, 3, 0, 3);
-
             filtro.Controls.Add(cmbFiltroTurma, 1, 0);
 
             principal.Controls.Add(filtro, 0, 3);
         }
 
-        // Cria a tabela de consulta e o contador de matrículas.
-        private void CriarAreaTabela(TableLayoutPanel principal)
+        // Padroniza os painéis horizontais.
+        private static TableLayoutPanel CriarPainelHorizontal(
+            int larguraRotulo)
+        {
+            TableLayoutPanel painel = new()
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(15, 8, 15, 8),
+                BackColor = Color.White,
+                Margin = new Padding(0, 0, 0, 10)
+            };
+
+            painel.ColumnStyles.Add(
+                new ColumnStyle(
+                    SizeType.Absolute,
+                    larguraRotulo));
+
+            painel.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100));
+
+            painel.RowStyles.Add(
+                new RowStyle(SizeType.Percent, 100));
+
+            return painel;
+        }
+
+        // Cria a tabela de matrículas.
+        private void CriarAreaTabela(
+            TableLayoutPanel principal)
         {
             TableLayoutPanel areaTabela = new()
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                Padding = new Padding(15),
-                BackColor = Color.White,
-                Margin = new Padding(0)
+                Margin = Padding.Empty
             };
 
             areaTabela.ColumnStyles.Add(
@@ -340,7 +369,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 new RowStyle(SizeType.Percent, 100));
 
             areaTabela.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 35));
+                new RowStyle(SizeType.Absolute, 30));
 
             dgvMatriculas = new DataGridView
             {
@@ -354,17 +383,17 @@ namespace PIM_IV.Painel_ADM.Forms
                     DataGridViewSelectionMode.FullRowSelect,
                 AutoSizeColumnsMode =
                     DataGridViewAutoSizeColumnsMode.Fill,
+                AutoGenerateColumns = true,
                 RowHeadersVisible = false,
                 BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle,
-                AutoGenerateColumns = true
+                BorderStyle = BorderStyle.FixedSingle
             };
 
             ConfigurarEstiloTabela();
 
             lblTotal = new Label
             {
-                Text = "Matrículas: 0",
+                Text = "Matrículas encontradas: 0",
                 Dock = DockStyle.Fill,
                 ForeColor = Color.DimGray,
                 TextAlign = ContentAlignment.MiddleLeft
@@ -376,12 +405,9 @@ namespace PIM_IV.Painel_ADM.Forms
             principal.Controls.Add(areaTabela, 0, 4);
         }
 
-        // Padroniza a aparência da tabela.
+        // Configura a aparência da tabela.
         private void ConfigurarEstiloTabela()
         {
-            dgvMatriculas.ColumnHeadersDefaultCellStyle.Font =
-                new Font("Segoe UI", 10, FontStyle.Bold);
-
             dgvMatriculas.ColumnHeadersHeight = 35;
 
             dgvMatriculas.ColumnHeadersHeightSizeMode =
@@ -389,12 +415,16 @@ namespace PIM_IV.Painel_ADM.Forms
 
             dgvMatriculas.RowTemplate.Height = 30;
 
+            dgvMatriculas.ColumnHeadersDefaultCellStyle.Font =
+                new Font("Segoe UI", 10, FontStyle.Bold);
+
             dgvMatriculas.AlternatingRowsDefaultCellStyle.BackColor =
                 Color.FromArgb(245, 248, 252);
         }
 
-        // Cria os botões de operações acadêmicas.
-        private void CriarAreaBotoes(TableLayoutPanel principal)
+        // Cria os botões de gerenciamento.
+        private void CriarAreaBotoes(
+            TableLayoutPanel principal)
         {
             FlowLayoutPanel botoes = new()
             {
@@ -402,8 +432,8 @@ namespace PIM_IV.Painel_ADM.Forms
                 FlowDirection = FlowDirection.RightToLeft,
                 WrapContents = false,
                 AutoScroll = true,
-                Padding = new Padding(0, 12, 0, 0),
-                Margin = new Padding(0)
+                Padding = new Padding(0, 10, 0, 0),
+                Margin = Padding.Empty
             };
 
             btnAcoes = CriarBotao(
@@ -424,7 +454,7 @@ namespace PIM_IV.Painel_ADM.Forms
             CriarMenuAcoes();
         }
 
-        // Configura as opções do menu de ações.
+        // Cria o menu de operações acadêmicas.
         private void CriarMenuAcoes()
         {
             menuAcoes = new ContextMenuStrip
@@ -437,20 +467,22 @@ namespace PIM_IV.Painel_ADM.Forms
                 "Matricular aluno",
                 MatricularAluno);
 
-            menuAcoes.Items.Add(new ToolStripSeparator());
+            menuAcoes.Items.Add(
+                new ToolStripSeparator());
 
             AdicionarAcao(
                 "Transferir turma",
                 TransferirTurma);
 
-            menuAcoes.Items.Add(new ToolStripSeparator());
+            menuAcoes.Items.Add(
+                new ToolStripSeparator());
 
             AdicionarAcao(
                 "Alterar situação",
                 AlterarSituacao);
         }
 
-        // Reutiliza a criação de itens do menu.
+        // Adiciona uma operação ao menu.
         private void AdicionarAcao(
             string texto,
             Action acao)
@@ -462,7 +494,7 @@ namespace PIM_IV.Painel_ADM.Forms
             menuAcoes.Items.Add(item);
         }
 
-        // Exibe o menu de operações acadêmicas.
+        // Exibe o menu de ações.
         private void ExibirMenuAcoes()
         {
             menuAcoes.Show(
@@ -471,7 +503,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 ToolStripDropDownDirection.AboveRight);
         }
 
-        // Cria rótulos com a identidade visual do sistema.
+        // Padroniza os rótulos.
         private Label CriarRotulo(string texto)
         {
             return new Label
@@ -479,30 +511,35 @@ namespace PIM_IV.Painel_ADM.Forms
                 Text = texto,
                 Dock = DockStyle.Fill,
                 ForeColor = _corAzul,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    10,
+                    FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft
             };
         }
 
-        // Cria campos de seleção padronizados.
+        // Padroniza os campos de seleção.
         private static ComboBox CriarCombo()
         {
             return new ComboBox
             {
                 Dock = DockStyle.Fill,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Margin = new Padding(5, 5, 15, 5)
+                Margin = new Padding(5, 5, 10, 5)
             };
         }
 
-        // Cria botões com efeitos visuais padronizados.
-        private Button CriarBotao(string texto, int largura)
+        // Padroniza os botões do formulário.
+        private Button CriarBotao(
+            string texto,
+            int largura)
         {
             Button botao = new()
             {
                 Text = texto,
                 Width = largura,
-                Height = 42,
+                Height = 43,
                 BackColor = _corAzul,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -513,7 +550,8 @@ namespace PIM_IV.Painel_ADM.Forms
             botao.FlatAppearance.BorderSize = 0;
 
             botao.MouseEnter += (_, _) =>
-                botao.BackColor = Color.FromArgb(30, 75, 145);
+                botao.BackColor =
+                    Color.FromArgb(30, 75, 145);
 
             botao.MouseLeave += (_, _) =>
                 botao.BackColor = _corAzul;
@@ -521,44 +559,72 @@ namespace PIM_IV.Painel_ADM.Forms
             return botao;
         }
 
-        // Executa uma consulta e retorna seus resultados.
-        private static DataTable ConsultarTabela(
-            SqlConnection conexao,
-            string sql)
-        {
-            using SqlCommand comando =
-                new(sql, conexao);
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
-
-            DataTable tabela = new();
-            tabela.Load(leitor);
-
-            return tabela;
-        }
-
-        // Atualiza os alunos e as turmas disponíveis.
+        // Atualiza os campos e a tabela pela API.
         private void AtualizarDados()
         {
+            _timerPesquisa.Stop();
+
             int filtroAnterior = ObterId(cmbFiltroTurma);
 
             try
             {
                 _carregando = true;
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Get,
+                    "matriculas/opcoes");
 
-                conexao.Open();
+                DataTable alunos = ConverterOpcoes(
+                    resposta.GetProperty("alunos"),
+                    "IdAluno");
 
-                CarregarAlunos(conexao);
-                CarregarTurmas(conexao);
-                CarregarFiltroTurmas(conexao, filtroAnterior);
+                DataTable turmas = ConverterOpcoes(
+                    resposta.GetProperty("turmas"),
+                    "IdTurma");
+
+                DataTable filtroTurmas = ConverterOpcoes(
+                    resposta.GetProperty("filtroTurmas"),
+                    "IdTurma");
+
+                ConfigurarFonteCombo(
+                    cmbAluno,
+                    alunos,
+                    "IdAluno");
+
+                ConfigurarFonteCombo(
+                    cmbTurma,
+                    turmas,
+                    "IdTurma");
+
+                DataRow todasTurmas = filtroTurmas.NewRow();
+
+                todasTurmas["IdTurma"] = 0;
+                todasTurmas["NomeExibicao"] =
+                    "Todas as turmas";
+
+                filtroTurmas.Rows.InsertAt(
+                    todasTurmas,
+                    0);
+
+                ConfigurarFonteCombo(
+                    cmbFiltroTurma,
+                    filtroTurmas,
+                    "IdTurma");
+
+                cmbFiltroTurma.SelectedValue =
+                    filtroAnterior;
+
+                if (cmbFiltroTurma.SelectedIndex < 0)
+                {
+                    cmbFiltroTurma.SelectedIndex = 0;
+                }
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao carregar dados", ex);
+                MostrarErro(
+                    "Erro ao carregar dados",
+                    ex);
+
                 return;
             }
             finally
@@ -570,104 +636,49 @@ namespace PIM_IV.Painel_ADM.Forms
             LimparCampos();
         }
 
-        // Consulta os alunos ativos para matrícula.
-        private void CarregarAlunos(SqlConnection conexao)
+        // Converte as opções retornadas pela API.
+        private static DataTable ConverterOpcoes(
+            JsonElement registros,
+            string campoIdentificador)
         {
-            const string sql = @"
-                SELECT
-                    a.IdAluno,
-                    a.MatriculaAluno + N' - ' +
-                        u.NomeCompleto AS NomeExibicao
-                FROM dbo.Alunos a
-                INNER JOIN dbo.Usuarios u
-                    ON u.IdUsuario = a.IdUsuario
-                WHERE u.Ativo = 1
-                ORDER BY u.NomeCompleto";
+            DataTable tabela = new();
 
-            DataTable alunos = ConsultarTabela(conexao, sql);
+            tabela.Columns.Add(
+                campoIdentificador,
+                typeof(int));
 
-            ConfigurarFonteCombo(
-                cmbAluno,
-                alunos,
+            tabela.Columns.Add(
                 "NomeExibicao",
-                "IdAluno");
-        }
+                typeof(string));
 
-        // Consulta as turmas ativas disponíveis.
-        private void CarregarTurmas(SqlConnection conexao)
-        {
-            const string sql = @"
-                SELECT
-                    IdTurma,
-                    CodigoTurma + N' - ' +
-                        NomeTurma AS NomeExibicao
-                FROM dbo.Turmas
-                WHERE Ativa = 1
-                ORDER BY CodigoTurma";
-
-            DataTable turmas = ConsultarTabela(conexao, sql);
-
-            ConfigurarFonteCombo(
-                cmbTurma,
-                turmas,
-                "NomeExibicao",
-                "IdTurma");
-        }
-
-        // Carrega turmas ativas e inativas para consulta.
-        private void CarregarFiltroTurmas(
-            SqlConnection conexao,
-            int filtroAnterior)
-        {
-            const string sql = @"
-                SELECT
-                    IdTurma,
-                    CodigoTurma + N' - ' +
-                        NomeTurma +
-                        CASE
-                            WHEN Ativa = 0
-                            THEN N' (Inativa)'
-                            ELSE N''
-                        END AS NomeExibicao
-                FROM dbo.Turmas
-                ORDER BY CodigoTurma";
-
-            DataTable turmas = ConsultarTabela(conexao, sql);
-
-            DataRow todasTurmas = turmas.NewRow();
-
-            todasTurmas["IdTurma"] = 0;
-            todasTurmas["NomeExibicao"] = "Todas as turmas";
-
-            turmas.Rows.InsertAt(todasTurmas, 0);
-
-            ConfigurarFonteCombo(
-                cmbFiltroTurma,
-                turmas,
-                "NomeExibicao",
-                "IdTurma");
-
-            cmbFiltroTurma.SelectedValue = filtroAnterior;
-
-            if (cmbFiltroTurma.SelectedIndex < 0)
+            foreach (
+                JsonElement registro in
+                registros.EnumerateArray())
             {
-                cmbFiltroTurma.SelectedIndex = 0;
+                tabela.Rows.Add(
+                    registro.GetProperty(
+                        campoIdentificador).GetInt32(),
+
+                    registro.GetProperty(
+                        "NomeExibicao").GetString()
+                            ?? string.Empty);
             }
+
+            return tabela;
         }
 
-        // Padroniza a vinculação de dados aos ComboBoxes.
+        // Configura a fonte de dados dos campos.
         private static void ConfigurarFonteCombo(
             ComboBox combo,
-            DataTable dados,
-            string campoExibicao,
-            string campoValor)
+            DataTable tabela,
+            string campoIdentificador)
         {
-            combo.DisplayMember = campoExibicao;
-            combo.ValueMember = campoValor;
-            combo.DataSource = dados;
+            combo.DisplayMember = "NomeExibicao";
+            combo.ValueMember = campoIdentificador;
+            combo.DataSource = tabela;
         }
 
-        // Consulta matrículas utilizando pesquisa e filtro por turma.
+        // Consulta as matrículas conforme os filtros.
         private void CarregarMatriculas()
         {
             if (_carregando)
@@ -679,61 +690,21 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 _carregando = true;
 
-                const string sql = @"
-                    SELECT
-                        m.IdMatricula,
-                        a.IdAluno,
-                        t.IdTurma,
-                        a.MatriculaAluno AS RA,
-                        u.NomeCompleto AS Aluno,
-                        t.CodigoTurma AS Turma,
-                        t.NomeTurma AS NomeTurma,
-                        m.Situacao,
-                        m.DataMatricula
-                    FROM dbo.Matriculas m
-                    INNER JOIN dbo.Alunos a
-                        ON a.IdAluno = m.IdAluno
-                    INNER JOIN dbo.Usuarios u
-                        ON u.IdUsuario = a.IdUsuario
-                    INNER JOIN dbo.Turmas t
-                        ON t.IdTurma = m.IdTurma
-                    WHERE
-                        (@IdTurma = 0 OR t.IdTurma = @IdTurma)
-                        AND
-                        (
-                            @Pesquisa = N''
-                            OR u.NomeCompleto LIKE
-                                N'%' + @Pesquisa + N'%'
-                            OR a.MatriculaAluno LIKE
-                                N'%' + @Pesquisa + N'%'
-                            OR t.CodigoTurma LIKE
-                                N'%' + @Pesquisa + N'%'
-                        )
-                    ORDER BY u.NomeCompleto";
+                int idTurma = ObterId(cmbFiltroTurma);
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                string pesquisa = Uri.EscapeDataString(
+                    txtPesquisa.Text.Trim());
 
-                using SqlCommand comando =
-                    new(sql, conexao);
+                string rota =
+                    $"matriculas?idTurma={idTurma}" +
+                    $"&pesquisa={pesquisa}";
 
-                comando.Parameters.Add(
-                    "@Pesquisa",
-                    SqlDbType.NVarChar,
-                    150).Value = txtPesquisa.Text.Trim();
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Get,
+                    rota);
 
-                comando.Parameters.Add(
-                    "@IdTurma",
-                    SqlDbType.Int).Value =
-                        ObterId(cmbFiltroTurma);
-
-                conexao.Open();
-
-                using SqlDataReader leitor =
-                    comando.ExecuteReader();
-
-                DataTable tabela = new();
-                tabela.Load(leitor);
+                DataTable tabela = ConverterMatriculas(
+                    resposta.GetProperty("matriculas"));
 
                 AtualizarTabelaMatriculas(tabela);
             }
@@ -749,8 +720,87 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // Atualiza a tabela e limpa a seleção anterior.
-        private void AtualizarTabelaMatriculas(DataTable tabela)
+        // Converte os registros da API em uma tabela.
+        private static DataTable ConverterMatriculas(
+            JsonElement registros)
+        {
+            DataTable tabela = new();
+
+            tabela.Columns.Add(
+                "IdMatricula",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "IdAluno",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "IdTurma",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "RA",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Aluno",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Turma",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "NomeTurma",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Situacao",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "DataMatricula",
+                typeof(DateTime));
+
+            foreach (
+                JsonElement registro in
+                registros.EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty(
+                        "IdMatricula").GetInt32(),
+
+                    registro.GetProperty(
+                        "IdAluno").GetInt32(),
+
+                    registro.GetProperty(
+                        "IdTurma").GetInt32(),
+
+                    registro.GetProperty(
+                        "RA").GetString(),
+
+                    registro.GetProperty(
+                        "Aluno").GetString(),
+
+                    registro.GetProperty(
+                        "Turma").GetString(),
+
+                    registro.GetProperty(
+                        "NomeTurma").GetString(),
+
+                    registro.GetProperty(
+                        "Situacao").GetString(),
+
+                    registro.GetProperty(
+                        "DataMatricula").GetDateTime());
+            }
+
+            return tabela;
+        }
+
+        // Atualiza os registros exibidos.
+        private void AtualizarTabelaMatriculas(
+            DataTable tabela)
         {
             dgvMatriculas.DataSource = tabela;
 
@@ -765,7 +815,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 $"Matrículas encontradas: {tabela.Rows.Count}";
         }
 
-        // Configura as colunas exibidas na consulta.
+        // Configura os títulos e oculta os identificadores.
         private void ConfigurarColunasMatriculas()
         {
             string[] colunasOcultas =
@@ -779,7 +829,8 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 if (dgvMatriculas.Columns.Contains(coluna))
                 {
-                    dgvMatriculas.Columns[coluna]!.Visible = false;
+                    dgvMatriculas.Columns[coluna]!
+                        .Visible = false;
                 }
             }
 
@@ -796,11 +847,12 @@ namespace PIM_IV.Painel_ADM.Forms
             if (dgvMatriculas.Columns.Contains("DataMatricula"))
             {
                 dgvMatriculas.Columns["DataMatricula"]!
-                    .DefaultCellStyle.Format = "dd/MM/yyyy";
+                    .DefaultCellStyle.Format =
+                        "dd/MM/yyyy";
             }
         }
 
-        // Define o título de uma coluna existente.
+        // Define o título de uma coluna.
         private void DefinirCabecalho(
             string nomeColuna,
             string titulo)
@@ -815,9 +867,15 @@ namespace PIM_IV.Painel_ADM.Forms
         // Preenche os campos com a matrícula selecionada.
         private void SelecionarMatricula()
         {
-            if (_carregando ||
-                dgvMatriculas.SelectedRows.Count == 0)
+            if (_carregando)
             {
+                return;
+            }
+
+            if (dgvMatriculas.SelectedRows.Count == 0)
+            {
+                _idMatriculaSelecionada = 0;
+                _idAlunoSelecionado = 0;
                 return;
             }
 
@@ -838,14 +896,18 @@ namespace PIM_IV.Painel_ADM.Forms
                     Convert.ToInt32(
                         linha.Cells["IdTurma"].Value);
 
-                cmbAluno.SelectedValue = _idAlunoSelecionado;
+                cmbAluno.SelectedValue =
+                    _idAlunoSelecionado;
 
                 cmbTurma.SelectedValue = idTurma;
 
                 cmbSituacao.SelectedItem =
                     Convert.ToString(
                         linha.Cells["Situacao"].Value)
-                    ?? SituacaoAtiva;
+                    ?? "Ativa";
+
+                // Impede trocar o aluno de uma matrícula existente.
+                cmbAluno.Enabled = false;
             }
             catch (Exception ex)
             {
@@ -855,7 +917,7 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // Obtém o identificador selecionado em um ComboBox.
+        // Obtém o identificador selecionado.
         private static int ObterId(ComboBox combo)
         {
             return combo.SelectedValue is int id
@@ -863,7 +925,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 : 0;
         }
 
-        // Verifica se aluno e turma foram selecionados.
+        // Valida a seleção de aluno e turma.
         private static bool ValidarSelecaoMatricula(
             int idAluno,
             int idTurma)
@@ -881,19 +943,42 @@ namespace PIM_IV.Painel_ADM.Forms
             return false;
         }
 
-        // Inicia o processo de matrícula do aluno.
+        // Cria uma matrícula pela API.
         private void MatricularAluno()
         {
+            if (_idMatriculaSelecionada > 0)
+            {
+                ExibirMensagem(
+                    "Clique em Novo / Limpar antes de realizar uma matrícula.",
+                    "Nova matrícula",
+                    MessageBoxIcon.Information);
+
+                return;
+            }
+
             int idAluno = ObterId(cmbAluno);
             int idTurma = ObterId(cmbTurma);
 
-            if (!ValidarSelecaoMatricula(idAluno, idTurma))
+            if (!ValidarSelecaoMatricula(
+                idAluno,
+                idTurma))
             {
                 return;
             }
 
+            if (cmbSituacao.SelectedItem?.ToString() != "Ativa")
+            {
+                ExibirMensagem(
+                    "Uma nova matrícula deve iniciar com a situação Ativa.",
+                    "Situação inválida",
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
             if (!ConfirmarOperacao(
-                "Confirmar a matrícula deste aluno na turma selecionada?",
+                $"Deseja matricular {cmbAluno.Text} " +
+                $"na turma {cmbTurma.Text}?",
                 "Confirmar matrícula"))
             {
                 return;
@@ -901,41 +986,19 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                bool matriculaCriada = ExecutarTransacao(
-                    (conexao, transacao) =>
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Post,
+                    "matriculas",
+                    new
                     {
-                        bool criada = InserirMatricula(
-                            conexao,
-                            transacao,
-                            idAluno,
-                            idTurma);
-
-                        if (criada)
-                        {
-                            RegistrarAuditoria(
-                                conexao,
-                                transacao,
-                                "CRIAR_MATRICULA",
-                                $"Aluno {idAluno} matriculado " +
-                                $"na turma {idTurma}.");
-                        }
-
-                        return criada;
+                        idAluno,
+                        idTurma
                     });
 
-                if (!matriculaCriada)
-                {
-                    ExibirMensagem(
-                        "Este aluno já possui matrícula. " +
-                        "Utilize Transferir turma ou Alterar situação.",
-                        "Matrícula existente",
-                        MessageBoxIcon.Information);
-
-                    return;
-                }
-
                 ExibirMensagem(
-                    "Matrícula realizada com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Matrícula realizada com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
@@ -943,63 +1006,13 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao matricular aluno", ex);
+                MostrarErro(
+                    "Erro ao matricular aluno",
+                    ex);
             }
         }
 
-        // Impede a criação de matrículas duplicadas.
-        private static bool InserirMatricula(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idAluno,
-            int idTurma)
-        {
-            const string sql = @"
-                IF EXISTS
-                (
-                    SELECT 1
-                    FROM dbo.Matriculas WITH (UPDLOCK, HOLDLOCK)
-                    WHERE IdAluno = @IdAluno
-                )
-                BEGIN
-                    SELECT 0;
-                END
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.Matriculas
-                    (
-                        IdAluno,
-                        IdTurma,
-                        DataMatricula,
-                        Situacao
-                    )
-                    VALUES
-                    (
-                        @IdAluno,
-                        @IdTurma,
-                        SYSDATETIME(),
-                        N'Ativa'
-                    );
-
-                    SELECT 1;
-                END";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdAluno",
-                SqlDbType.Int).Value = idAluno;
-
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = idTurma;
-
-            return Convert.ToInt32(
-                comando.ExecuteScalar()) == 1;
-        }
-
-        // Transfere uma matrícula ativa para outra turma.
+        // Transfere a matrícula utilizando a procedure pela API.
         private void TransferirTurma()
         {
             if (!ValidarMatriculaSelecionada())
@@ -1007,9 +1020,9 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
-            int novaTurma = ObterId(cmbTurma);
+            int idTurma = ObterId(cmbTurma);
 
-            if (novaTurma <= 0)
+            if (idTurma <= 0)
             {
                 ExibirMensagem(
                     "Selecione a turma de destino.",
@@ -1019,39 +1032,58 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
+            DataGridViewRow linha =
+                dgvMatriculas.SelectedRows[0];
+
+            int idTurmaAtual = Convert.ToInt32(
+                linha.Cells["IdTurma"].Value);
+
+            string situacaoAtual = Convert.ToString(
+                linha.Cells["Situacao"].Value)
+                ?? string.Empty;
+
+            if (situacaoAtual != "Ativa")
+            {
+                ExibirMensagem(
+                    "Somente matrículas ativas podem ser transferidas.",
+                    "Transferência indisponível",
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            if (idTurmaAtual == idTurma)
+            {
+                ExibirMensagem(
+                    "Selecione uma turma diferente da atual.",
+                    "Transferência",
+                    MessageBoxIcon.Information);
+
+                return;
+            }
+
             if (!ConfirmarOperacao(
-                "Deseja transferir o aluno para a turma selecionada?\n" +
-                "A matrícula atual será atualizada.",
+                $"Deseja transferir o aluno para {cmbTurma.Text}?\n\n" +
+                "O histórico da turma anterior será preservado.",
                 "Confirmar transferência"))
             {
                 return;
             }
 
-            int idMatricula = _idMatriculaSelecionada;
-            int idAluno = _idAlunoSelecionado;
-
             try
             {
-                ExecutarTransacao(
-                    (conexao, transacao) =>
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Put,
+                    $"matriculas/{_idMatriculaSelecionada}/transferencia",
+                    new
                     {
-                        AtualizarTurmaMatricula(
-                            conexao,
-                            transacao,
-                            idMatricula,
-                            idAluno,
-                            novaTurma);
-
-                        RegistrarAuditoria(
-                            conexao,
-                            transacao,
-                            "TRANSFERIR_MATRICULA",
-                            $"Matrícula {idMatricula} " +
-                            $"transferida para turma {novaTurma}.");
+                        idTurma
                     });
 
                 ExibirMensagem(
-                    "Transferência realizada com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Transferência realizada com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
@@ -1059,49 +1091,9 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao transferir aluno", ex);
-            }
-        }
-
-        // Atualiza a turma sem excluir a matrícula.
-        private static void AtualizarTurmaMatricula(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idMatricula,
-            int idAluno,
-            int novaTurma)
-        {
-            const string sql = @"
-                UPDATE dbo.Matriculas
-                SET IdTurma = @IdTurma
-                WHERE IdMatricula = @IdMatricula
-                  AND IdAluno = @IdAluno
-                  AND IdTurma <> @IdTurma
-                  AND Situacao = N'Ativa'";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdTurma",
-                SqlDbType.Int).Value = novaTurma;
-
-            comando.Parameters.Add(
-                "@IdMatricula",
-                SqlDbType.Int).Value = idMatricula;
-
-            comando.Parameters.Add(
-                "@IdAluno",
-                SqlDbType.Int).Value = idAluno;
-
-            int registrosAlterados = comando.ExecuteNonQuery();
-
-            if (registrosAlterados != 1)
-            {
-                throw new InvalidOperationException(
-                    "A transferência não foi realizada. " +
-                    "Verifique se a matrícula está ativa " +
-                    "e se a turma de destino é diferente.");
+                MostrarErro(
+                    "Erro ao transferir aluno",
+                    ex);
             }
         }
 
@@ -1114,50 +1106,56 @@ namespace PIM_IV.Painel_ADM.Forms
             }
 
             string situacao =
-                cmbSituacao.SelectedItem?.ToString() ?? "";
+                cmbSituacao.SelectedItem?.ToString()
+                ?? string.Empty;
 
             if (!SituacaoValida(situacao))
             {
                 ExibirMensagem(
-                    "Selecione uma situação válida.",
-                    "Dados inválidos",
+                    "Selecione uma situação acadêmica válida.",
+                    "Situação inválida",
                     MessageBoxIcon.Warning);
 
                 return;
             }
 
+            string situacaoAtual = Convert.ToString(
+                dgvMatriculas.SelectedRows[0]
+                    .Cells["Situacao"].Value)
+                ?? string.Empty;
+
+            if (situacaoAtual == situacao)
+            {
+                ExibirMensagem(
+                    "A matrícula já possui essa situação.",
+                    "Alterar situação",
+                    MessageBoxIcon.Information);
+
+                return;
+            }
+
             if (!ConfirmarOperacao(
-                $"Alterar a situação desta matrícula para '{situacao}'?",
+                $"Deseja alterar a situação de {situacaoAtual} " +
+                $"para {situacao}?",
                 "Confirmar alteração"))
             {
                 return;
             }
 
-            int idMatricula = _idMatriculaSelecionada;
-            int idAluno = _idAlunoSelecionado;
-
             try
             {
-                ExecutarTransacao(
-                    (conexao, transacao) =>
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Patch,
+                    $"matriculas/{_idMatriculaSelecionada}/situacao",
+                    new
                     {
-                        AtualizarSituacaoMatricula(
-                            conexao,
-                            transacao,
-                            idMatricula,
-                            idAluno,
-                            situacao);
-
-                        RegistrarAuditoria(
-                            conexao,
-                            transacao,
-                            "ALTERAR_SITUACAO_MATRICULA",
-                            $"Matrícula {idMatricula} " +
-                            $"alterada para {situacao}.");
+                        situacao
                     });
 
                 ExibirMensagem(
-                    "Situação atualizada com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Situação atualizada com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
@@ -1165,100 +1163,17 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao alterar situação", ex);
+                MostrarErro(
+                    "Erro ao alterar situação",
+                    ex);
             }
         }
 
-        // Atualiza somente a situação da matrícula.
-        private static void AtualizarSituacaoMatricula(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idMatricula,
-            int idAluno,
-            string situacao)
-        {
-            const string sql = @"
-                UPDATE dbo.Matriculas
-                SET Situacao = @Situacao
-                WHERE IdMatricula = @IdMatricula
-                  AND IdAluno = @IdAluno";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Situacao",
-                SqlDbType.NVarChar,
-                30).Value = situacao;
-
-            comando.Parameters.Add(
-                "@IdMatricula",
-                SqlDbType.Int).Value = idMatricula;
-
-            comando.Parameters.Add(
-                "@IdAluno",
-                SqlDbType.Int).Value = idAluno;
-
-            if (comando.ExecuteNonQuery() != 1)
-            {
-                throw new InvalidOperationException(
-                    "Matrícula não encontrada.");
-            }
-        }
-
-        // Executa uma operação dentro de uma transação SQL.
-        private T ExecutarTransacao<T>(
-            Func<SqlConnection, SqlTransaction, T> operacao)
-        {
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            conexao.Open();
-
-            using SqlTransaction transacao =
-                conexao.BeginTransaction();
-
-            try
-            {
-                ExigirAutorizacao(conexao, transacao);
-
-                T resultado = operacao(conexao, transacao);
-
-                transacao.Commit();
-
-                return resultado;
-            }
-            catch
-            {
-                ReverterTransacao(transacao);
-                throw;
-            }
-        }
-
-        // Permite operações que não precisam retornar valores.
-        private void ExecutarTransacao(
-            Action<SqlConnection, SqlTransaction> operacao)
-        {
-            ExecutarTransacao(
-                (conexao, transacao) =>
-                {
-                    operacao(conexao, transacao);
-                    return true;
-                });
-        }
-
-        // Atualiza a consulta após uma operação concluída.
-        private void AtualizarConsultaAposOperacao()
-        {
-            CarregarMatriculas();
-            LimparCampos();
-        }
-
-        // Verifica se existe uma matrícula selecionada.
+        // Valida a seleção de uma matrícula existente.
         private bool ValidarMatriculaSelecionada()
         {
             if (_idMatriculaSelecionada > 0 &&
-                _idAlunoSelecionado > 0)
+                dgvMatriculas.SelectedRows.Count == 1)
             {
                 return true;
             }
@@ -1271,16 +1186,24 @@ namespace PIM_IV.Painel_ADM.Forms
             return false;
         }
 
-        // Verifica se a situação informada é permitida.
-        private static bool SituacaoValida(string situacao)
+        // Verifica as situações acadêmicas permitidas.
+        private static bool SituacaoValida(
+            string situacao)
         {
-            return situacao == SituacaoAtiva ||
-                   situacao == SituacaoTrancada ||
-                   situacao == SituacaoConcluida ||
-                   situacao == SituacaoCancelada;
+            return situacao == "Ativa" ||
+                   situacao == "Trancada" ||
+                   situacao == "Concluida" ||
+                   situacao == "Cancelada";
         }
 
-        // Limpa os campos e prepara uma nova matrícula.
+        // Atualiza a consulta após uma operação.
+        private void AtualizarConsultaAposOperacao()
+        {
+            CarregarMatriculas();
+            LimparCampos();
+        }
+
+        // Limpa os campos para uma nova operação.
         private void LimparCampos()
         {
             _idMatriculaSelecionada = 0;
@@ -1288,118 +1211,89 @@ namespace PIM_IV.Painel_ADM.Forms
 
             dgvMatriculas.ClearSelection();
 
-            if (cmbAluno.Items.Count > 0)
-            {
-                cmbAluno.SelectedIndex = -1;
-            }
+            cmbAluno.Enabled = true;
+            cmbAluno.SelectedIndex = -1;
+            cmbTurma.SelectedIndex = -1;
 
-            if (cmbTurma.Items.Count > 0)
-            {
-                cmbTurma.SelectedIndex = -1;
-            }
-
-            cmbSituacao.SelectedItem = SituacaoAtiva;
+            cmbSituacao.SelectedItem = "Ativa";
         }
 
-        // Revalida a autorização diretamente no banco.
-        private void ExigirAutorizacao(
-            SqlConnection conexao,
-            SqlTransaction transacao)
+        // Executa requisições autenticadas pela API.
+        private static JsonElement ExecutarApi(
+            HttpMethod metodo,
+            string rota,
+            object? corpo = null)
         {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON p.IdPerfil = u.IdPerfil
-                INNER JOIN dbo.PerfilPermissoes pp
-                    ON pp.IdPerfil = p.IdPerfil
-                INNER JOIN dbo.Permissoes pm
-                    ON pm.IdPermissao = pp.IdPermissao
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.IdPerfil = @IdPerfil
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND pm.Codigo = @Permissao
-                  AND pm.Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = PerfilCoordenador;
-
-            comando.Parameters.Add(
-                "@Permissao",
-                SqlDbType.NVarChar,
-                100).Value = PermissaoGerenciarMatriculas;
-
-            bool autorizado =
-                Convert.ToInt32(comando.ExecuteScalar()) > 0;
-
-            if (!autorizado)
+            return Task.Run(async () =>
             {
-                throw new UnauthorizedAccessException(
-                    "Você não possui permissão para alterar matrículas.");
-            }
+                using HttpRequestMessage requisicao =
+                    new(metodo, rota);
+
+                if (corpo != null)
+                {
+                    requisicao.Content =
+                        JsonContent.Create(corpo);
+                }
+
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.SendAsync(
+                        requisicao);
+
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
+
+                JsonElement resultado;
+
+                try
+                {
+                    using JsonDocument documento =
+                        JsonDocument.Parse(conteudo);
+
+                    resultado =
+                        documento.RootElement.Clone();
+                }
+                catch (JsonException)
+                {
+                    throw new HttpRequestException(
+                        "A API retornou uma resposta inválida.",
+                        null,
+                        resposta.StatusCode);
+                }
+
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        ObterMensagem(
+                            resultado,
+                            "Não foi possível concluir a operação."),
+                        null,
+                        resposta.StatusCode);
+                }
+
+                return resultado;
+
+            }).GetAwaiter().GetResult();
         }
 
-        // Registra a atividade na mesma transação da operação.
-        private void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string acao,
-            string descricao)
+        // Recupera a mensagem retornada pela API.
+        private static string ObterMensagem(
+            JsonElement resposta,
+            string mensagemPadrao)
         {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = acao;
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value = descricao;
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Reverte uma transação que ainda está ativa.
-        private static void ReverterTransacao(
-            SqlTransaction transacao)
-        {
-            if (transacao.Connection != null)
+            if (resposta.ValueKind == JsonValueKind.Object &&
+                resposta.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem) &&
+                mensagem.ValueKind == JsonValueKind.String)
             {
-                transacao.Rollback();
+                return mensagem.GetString()
+                    ?? mensagemPadrao;
             }
+
+            return mensagemPadrao;
         }
 
-        // Solicita confirmação antes de executar uma operação.
+        // Solicita confirmação antes de modificar registros.
         private static bool ConfirmarOperacao(
             string mensagem,
             string titulo)
@@ -1408,7 +1302,8 @@ namespace PIM_IV.Painel_ADM.Forms
                 mensagem,
                 titulo,
                 MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question) == DialogResult.Yes;
+                MessageBoxIcon.Question)
+                == DialogResult.Yes;
         }
 
         // Exibe mensagens padronizadas.

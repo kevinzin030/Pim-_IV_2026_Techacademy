@@ -1,4 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Servicos;
@@ -13,13 +16,17 @@ namespace PIM_IV.Painel_ADM.Forms
     public class FrmGerenciarDisciplinas : Form
     {
         private const int PerfilCoordenador = 2;
-        private const string PermissaoGerenciarDisciplinas = "GERENCIAR_DISCIPLINAS";
+        private const string PermissaoGerenciarDisciplinas =
+            "GERENCIAR_DISCIPLINAS";
 
         private readonly Usuario _usuario;
         private readonly PermissaoService _permissaoService = new();
 
-        private readonly Color _corAzul = Color.FromArgb(40, 92, 170);
-        private readonly Color _corFundo = Color.FromArgb(244, 247, 251);
+        private readonly Color _corAzul =
+            Color.FromArgb(40, 92, 170);
+
+        private readonly Color _corFundo =
+            Color.FromArgb(244, 247, 251);
 
         private TextBox txtCodigo = null!;
         private TextBox txtNome = null!;
@@ -62,7 +69,9 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Carrega os dados após validar o acesso.
-        private void AoExibirFormulario(object? sender, EventArgs e)
+        private void AoExibirFormulario(
+            object? sender,
+            EventArgs e)
         {
             if (!VerificarAcesso())
             {
@@ -158,7 +167,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria os campos utilizados no cadastro e na edição.
-        private void CriarAreaCadastro(TableLayoutPanel principal)
+        private void CriarAreaCadastro(
+            TableLayoutPanel principal)
         {
             Panel painel = new()
             {
@@ -229,7 +239,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Padroniza os campos de texto do cadastro.
-        private static TextBox CriarCampoTexto(int tamanhoMaximo)
+        private static TextBox CriarCampoTexto(
+            int tamanhoMaximo)
         {
             return new TextBox
             {
@@ -243,7 +254,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria os botões de cadastro e alteração.
-        private void CriarBotoesCadastro(TableLayoutPanel campos)
+        private void CriarBotoesCadastro(
+            TableLayoutPanel campos)
         {
             FlowLayoutPanel botoes = new()
             {
@@ -277,7 +289,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria os controles de pesquisa e atualização.
-        private void CriarAreaPesquisa(TableLayoutPanel principal)
+        private void CriarAreaPesquisa(
+            TableLayoutPanel principal)
         {
             FlowLayoutPanel painel = new()
             {
@@ -332,7 +345,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Configura a tabela de consulta das disciplinas.
-        private void CriarTabela(TableLayoutPanel principal)
+        private void CriarTabela(
+            TableLayoutPanel principal)
         {
             dgvDisciplinas = new DataGridView
             {
@@ -342,10 +356,13 @@ namespace PIM_IV.Painel_ADM.Forms
                 AllowUserToDeleteRows = false,
                 AllowUserToResizeRows = false,
                 MultiSelect = false,
+
                 SelectionMode =
                     DataGridViewSelectionMode.FullRowSelect,
+
                 AutoSizeColumnsMode =
                     DataGridViewAutoSizeColumnsMode.Fill,
+
                 BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
                 RowHeadersVisible = false
@@ -401,8 +418,14 @@ namespace PIM_IV.Painel_ADM.Forms
                 Margin = new Padding(5, 0, 0, 0),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                BackColor = principal ? _corAzul : Color.White,
-                ForeColor = principal ? Color.White : _corAzul
+
+                BackColor = principal
+                    ? _corAzul
+                    : Color.White,
+
+                ForeColor = principal
+                    ? Color.White
+                    : _corAzul
             };
 
             botao.FlatAppearance.BorderColor = _corAzul;
@@ -416,44 +439,7 @@ namespace PIM_IV.Painel_ADM.Forms
         {
             try
             {
-                const string sql = @"
-                    SELECT
-                        IdDisciplina,
-                        CodigoDisciplina,
-                        NomeDisciplina,
-                        CargaHoraria,
-                        Ativa
-                    FROM dbo.Disciplinas
-                    WHERE @Pesquisa = ''
-                       OR CodigoDisciplina LIKE @Texto
-                       OR NomeDisciplina LIKE @Texto
-                    ORDER BY CodigoDisciplina ASC";
-
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
-
-                using SqlCommand comando =
-                    new(sql, conexao);
-
-                string pesquisa = txtPesquisa.Text.Trim();
-
-                comando.Parameters.Add(
-                    "@Pesquisa",
-                    SqlDbType.NVarChar,
-                    150).Value = pesquisa;
-
-                comando.Parameters.Add(
-                    "@Texto",
-                    SqlDbType.NVarChar,
-                    310).Value = "%" + pesquisa + "%";
-
-                conexao.Open();
-
-                using SqlDataReader leitor =
-                    comando.ExecuteReader();
-
-                DataTable tabela = new();
-                tabela.Load(leitor);
+                DataTable tabela = ConsultarRegistros();
 
                 AtualizarTabela(tabela);
 
@@ -462,7 +448,9 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao carregar disciplinas", ex);
+                MostrarErro(
+                    "Erro ao carregar disciplinas",
+                    ex);
             }
         }
 
@@ -474,7 +462,9 @@ namespace PIM_IV.Painel_ADM.Forms
             try
             {
                 dgvDisciplinas.DataSource = tabela;
+
                 ConfigurarColunas();
+
                 dgvDisciplinas.ClearSelection();
             }
             finally
@@ -488,13 +478,29 @@ namespace PIM_IV.Painel_ADM.Forms
         {
             if (dgvDisciplinas.Columns.Contains("IdDisciplina"))
             {
-                dgvDisciplinas.Columns["IdDisciplina"]!.Visible = false;
+                dgvDisciplinas.Columns["IdDisciplina"]!.Visible =
+                    false;
             }
 
-            DefinirColuna("CodigoDisciplina", "Código", 110);
-            DefinirColuna("NomeDisciplina", "Nome da disciplina", 240);
-            DefinirColuna("CargaHoraria", "Carga horária (h)", 110);
-            DefinirColuna("Ativa", "Ativa", 70);
+            DefinirColuna(
+                "CodigoDisciplina",
+                "Código",
+                110);
+
+            DefinirColuna(
+                "NomeDisciplina",
+                "Nome da disciplina",
+                240);
+
+            DefinirColuna(
+                "CargaHoraria",
+                "Carga horária (h)",
+                110);
+
+            DefinirColuna(
+                "Ativa",
+                "Ativa",
+                70);
         }
 
         // Configura uma coluna existente na tabela.
@@ -612,7 +618,7 @@ namespace PIM_IV.Painel_ADM.Forms
             return true;
         }
 
-        // Cadastra ou atualiza uma disciplina.
+        // Cadastra ou atualiza uma disciplina pela API.
         private void SalvarDisciplina()
         {
             if (!ValidarFormulario() || !VerificarAcesso())
@@ -622,9 +628,12 @@ namespace PIM_IV.Painel_ADM.Forms
 
             string codigo = txtCodigo.Text.Trim();
             string nome = txtNome.Text.Trim();
-            int cargaHoraria = (int)nudCargaHoraria.Value;
 
-            bool editando = _idDisciplinaSelecionada.HasValue;
+            int cargaHoraria =
+                (int)nudCargaHoraria.Value;
+
+            bool editando =
+                _idDisciplinaSelecionada.HasValue;
 
             string mensagem = editando
                 ? "Deseja salvar as alterações desta disciplina?"
@@ -637,63 +646,22 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                // A API valida, grava e registra a auditoria.
+                string rota = editando
+                    ? $"academico/disciplinas/{_idDisciplinaSelecionada.Value}"
+                    : "academico/disciplinas";
 
-                conexao.Open();
-
-                // Mantém a gravação e a auditoria na mesma transação.
-                using SqlTransaction transacao =
-                    conexao.BeginTransaction(
-                        IsolationLevel.Serializable);
-
-                try
-                {
-                    ExigirAutorizacao(conexao, transacao);
-
-                    // Verifica se o código já pertence a outra disciplina.
-                    ValidarCodigoDisponivel(
-                        conexao,
-                        transacao,
-                        codigo,
-                        _idDisciplinaSelecionada);
-
-                    // Impede disciplinas com nomes duplicados.
-                    ValidarNomeDisponivel(
-                        conexao,
-                        transacao,
-                        nome,
-                        _idDisciplinaSelecionada);
-
-                    int idRegistrado = GravarDisciplina(
-                        conexao,
-                        transacao,
-                        _idDisciplinaSelecionada,
-                        codigo,
-                        nome,
-                        cargaHoraria);
-
-                    RegistrarAuditoria(
-                        conexao,
-                        transacao,
-                        editando
-                            ? "ALTERACAO_DISCIPLINA"
-                            : "CADASTRO_DISCIPLINA",
-                        $"{(editando ? "Alterou" : "Cadastrou")} " +
-                        $"a disciplina {codigo} - {nome} " +
-                        $"(ID {idRegistrado}, {cargaHoraria} horas).");
-
-                    transacao.Commit();
-                }
-                catch
-                {
-                    if (transacao.Connection != null)
+                ExecutarApi(
+                    editando
+                        ? HttpMethod.Put
+                        : HttpMethod.Post,
+                    rota,
+                    new
                     {
-                        transacao.Rollback();
-                    }
-
-                    throw;
-                }
+                        codigo,
+                        nome,
+                        cargaHoraria
+                    });
 
                 ExibirMensagem(
                     editando
@@ -707,7 +675,6 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (InvalidOperationException ex)
             {
-                // Apresenta mensagens amigáveis de validação.
                 ExibirMensagem(
                     ex.Message,
                     "Validação",
@@ -715,212 +682,10 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao salvar disciplina", ex);
+                MostrarErro(
+                    "Erro ao salvar disciplina",
+                    ex);
             }
-        }
-
-        // Impede o cadastro de códigos duplicados.
-        private static void ValidarCodigoDisponivel(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string codigo,
-            int? idDisciplina)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Disciplinas WITH (UPDLOCK, HOLDLOCK)
-                WHERE CodigoDisciplina = @Codigo
-                  AND IdDisciplina <> @IdDisciplina";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Codigo",
-                SqlDbType.NVarChar,
-                30).Value = codigo;
-
-            comando.Parameters.Add(
-                "@IdDisciplina",
-                SqlDbType.Int).Value = idDisciplina ?? -1;
-
-            int quantidade =
-                Convert.ToInt32(comando.ExecuteScalar());
-
-            if (quantidade > 0)
-            {
-                throw new InvalidOperationException(
-                    "Já existe uma disciplina com esse código.");
-            }
-        }
-
-        // Impede disciplinas com nomes repetidos.
-        private static void ValidarNomeDisponivel(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string nome,
-            int? idDisciplina)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Disciplinas WITH (UPDLOCK, HOLDLOCK)
-                WHERE UPPER(LTRIM(RTRIM(NomeDisciplina))) =
-                      UPPER(LTRIM(RTRIM(@Nome)))
-                  AND IdDisciplina <> @IdDisciplina";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@Nome",
-                SqlDbType.NVarChar,
-                150).Value = nome;
-
-            comando.Parameters.Add(
-                "@IdDisciplina",
-                SqlDbType.Int).Value = idDisciplina ?? -1;
-
-            int quantidade =
-                Convert.ToInt32(comando.ExecuteScalar());
-
-            if (quantidade > 0)
-            {
-                throw new InvalidOperationException(
-                    "Já existe uma disciplina cadastrada com esse nome.");
-            }
-        }
-
-        // Insere ou atualiza a disciplina no banco.
-        private static int GravarDisciplina(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int? idDisciplina,
-            string codigo,
-            string nome,
-            int cargaHoraria)
-        {
-            if (idDisciplina.HasValue)
-            {
-                return AtualizarDisciplina(
-                    conexao,
-                    transacao,
-                    idDisciplina.Value,
-                    codigo,
-                    nome,
-                    cargaHoraria);
-            }
-
-            return InserirDisciplina(
-                conexao,
-                transacao,
-                codigo,
-                nome,
-                cargaHoraria);
-        }
-
-        // Atualiza os dados de uma disciplina existente.
-        private static int AtualizarDisciplina(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idDisciplina,
-            string codigo,
-            string nome,
-            int cargaHoraria)
-        {
-            const string sql = @"
-                UPDATE dbo.Disciplinas
-                SET CodigoDisciplina = @Codigo,
-                    NomeDisciplina = @Nome,
-                    CargaHoraria = @Carga
-                WHERE IdDisciplina = @IdDisciplina";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            AdicionarParametrosDisciplina(
-                comando,
-                codigo,
-                nome,
-                cargaHoraria);
-
-            comando.Parameters.Add(
-                "@IdDisciplina",
-                SqlDbType.Int).Value = idDisciplina;
-
-            if (comando.ExecuteNonQuery() != 1)
-            {
-                throw new InvalidOperationException(
-                    "Disciplina não encontrada para atualização.");
-            }
-
-            return idDisciplina;
-        }
-
-        // Insere uma nova disciplina e retorna seu identificador.
-        private static int InserirDisciplina(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string codigo,
-            string nome,
-            int cargaHoraria)
-        {
-            const string sql = @"
-                INSERT INTO dbo.Disciplinas
-                (
-                    CodigoDisciplina,
-                    NomeDisciplina,
-                    CargaHoraria,
-                    Ativa
-                )
-                OUTPUT inserted.IdDisciplina
-                VALUES
-                (
-                    @Codigo,
-                    @Nome,
-                    @Carga,
-                    1
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            AdicionarParametrosDisciplina(
-                comando,
-                codigo,
-                nome,
-                cargaHoraria);
-
-            object? resultado = comando.ExecuteScalar();
-
-            if (resultado == null || resultado == DBNull.Value)
-            {
-                throw new InvalidOperationException(
-                    "Não foi possível cadastrar a disciplina.");
-            }
-
-            return Convert.ToInt32(resultado);
-        }
-
-        // Centraliza os parâmetros utilizados nas gravações.
-        private static void AdicionarParametrosDisciplina(
-            SqlCommand comando,
-            string codigo,
-            string nome,
-            int cargaHoraria)
-        {
-            comando.Parameters.Add(
-                "@Codigo",
-                SqlDbType.NVarChar,
-                30).Value = codigo;
-
-            comando.Parameters.Add(
-                "@Nome",
-                SqlDbType.NVarChar,
-                150).Value = nome;
-
-            comando.Parameters.Add(
-                "@Carga",
-                SqlDbType.Int).Value = cargaHoraria;
         }
 
         // Alterna a situação da disciplina selecionada.
@@ -941,7 +706,8 @@ namespace PIM_IV.Painel_ADM.Forms
                 return;
             }
 
-            int idDisciplina = _idDisciplinaSelecionada.Value;
+            int idDisciplina =
+                _idDisciplinaSelecionada.Value;
 
             if (!ConfirmarOperacao(
                 "Deseja alterar a situação desta disciplina?"))
@@ -951,41 +717,30 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                // Consulta o status atual da disciplina.
+                DataTable registros =
+                    ConsultarRegistros(false);
 
-                conexao.Open();
+                DataRow? registro =
+                    registros.Rows.Find(idDisciplina);
 
-                using SqlTransaction transacao =
-                    conexao.BeginTransaction();
-
-                try
+                if (registro == null)
                 {
-                    ExigirAutorizacao(conexao, transacao);
-
-                    bool novoStatus = AtualizarStatusDisciplina(
-                        conexao,
-                        transacao,
-                        idDisciplina);
-
-                    RegistrarAuditoria(
-                        conexao,
-                        transacao,
-                        "ALTERACAO_STATUS_DISCIPLINA",
-                        $"Disciplina ID {idDisciplina} " +
-                        (novoStatus ? "ativada." : "desativada."));
-
-                    transacao.Commit();
+                    throw new InvalidOperationException(
+                        "Registro não encontrado.");
                 }
-                catch
-                {
-                    if (transacao.Connection != null)
+
+                bool ativa =
+                    !Convert.ToBoolean(registro["Ativa"]);
+
+                // Encaminha a alteração de status para a API.
+                ExecutarApi(
+                    HttpMethod.Patch,
+                    $"academico/disciplinas/{idDisciplina}/status",
+                    new
                     {
-                        transacao.Rollback();
-                    }
-
-                    throw;
-                }
+                        ativa
+                    });
 
                 ExibirMensagem(
                     "Situação da disciplina atualizada!",
@@ -997,132 +752,15 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao alterar situação", ex);
+                MostrarErro(
+                    "Erro ao alterar situação",
+                    ex);
             }
-        }
-
-        // Altera o status sem excluir o registro.
-        private static bool AtualizarStatusDisciplina(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idDisciplina)
-        {
-            const string sql = @"
-                UPDATE dbo.Disciplinas
-                SET Ativa =
-                    CASE WHEN Ativa = 1 THEN 0 ELSE 1 END
-                OUTPUT inserted.Ativa
-                WHERE IdDisciplina = @IdDisciplina";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdDisciplina",
-                SqlDbType.Int).Value = idDisciplina;
-
-            object? resultado = comando.ExecuteScalar();
-
-            if (resultado == null || resultado == DBNull.Value)
-            {
-                throw new InvalidOperationException(
-                    "Disciplina não encontrada.");
-            }
-
-            return Convert.ToBoolean(resultado);
-        }
-
-        // Revalida a autorização no banco antes de modificar dados.
-        private void ExigirAutorizacao(
-            SqlConnection conexao,
-            SqlTransaction transacao)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                INNER JOIN dbo.PerfilPermissoes pp
-                    ON p.IdPerfil = pp.IdPerfil
-                INNER JOIN dbo.Permissoes pm
-                    ON pp.IdPermissao = pm.IdPermissao
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.IdPerfil = @IdPerfil
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND pm.Codigo = @Permissao
-                  AND pm.Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@IdPerfil",
-                SqlDbType.Int).Value = PerfilCoordenador;
-
-            comando.Parameters.Add(
-                "@Permissao",
-                SqlDbType.NVarChar,
-                100).Value = PermissaoGerenciarDisciplinas;
-
-            bool autorizado =
-                Convert.ToInt32(comando.ExecuteScalar()) > 0;
-
-            if (!autorizado)
-            {
-                throw new UnauthorizedAccessException(
-                    "Você não possui autorização para " +
-                    "gerenciar disciplinas.");
-            }
-        }
-
-        // Registra a operação na mesma transação dos dados.
-        private void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string acao,
-            string descricao)
-        {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = acao;
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value = descricao;
-
-            comando.ExecuteNonQuery();
         }
 
         // Solicita confirmação antes de executar uma alteração.
-        private static bool ConfirmarOperacao(string mensagem)
+        private static bool ConfirmarOperacao(
+            string mensagem)
         {
             return MessageBox.Show(
                 mensagem,
@@ -1153,6 +791,145 @@ namespace PIM_IV.Painel_ADM.Forms
                 contexto + ":\n" + excecao.Message,
                 "Erro",
                 MessageBoxIcon.Error);
+        }
+
+        // Executa requisições autenticadas na API.
+        private static JsonElement ExecutarApi(
+            HttpMethod metodo,
+            string rota,
+            object? dados = null)
+        {
+            return Task.Run(async () =>
+            {
+                using HttpRequestMessage requisicao =
+                    new(metodo, rota);
+
+                if (dados != null)
+                {
+                    requisicao.Content =
+                        JsonContent.Create(dados);
+                }
+
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.SendAsync(
+                        requisicao);
+
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
+
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                // Apresenta a mensagem retornada pelo servidor.
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        documento.RootElement.TryGetProperty(
+                            "mensagem",
+                            out JsonElement mensagem)
+
+                            ? mensagem.GetString()
+
+                            : "Não foi possível concluir a operação.");
+                }
+
+                return documento.RootElement.Clone();
+
+            }).GetAwaiter().GetResult();
+        }
+
+        // Converte a resposta JSON para a estrutura da tabela.
+        private DataTable ConsultarRegistros(
+            bool filtrar = true)
+        {
+            string pesquisa = filtrar
+                ? txtPesquisa.Text.Trim()
+                : string.Empty;
+
+            JsonElement resposta = ExecutarApi(
+                HttpMethod.Get,
+                "academico/disciplinas");
+
+            DataTable tabela = new();
+
+            tabela.Columns.Add(
+                "IdDisciplina",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "CodigoDisciplina",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "NomeDisciplina",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "CargaHoraria",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "Ativa",
+                typeof(bool));
+
+            tabela.PrimaryKey = new[]
+            {
+                tabela.Columns["IdDisciplina"]!
+            };
+
+            // Converte os registros retornados pela API.
+            foreach (JsonElement registro in
+                resposta.GetProperty("registros").EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty(
+                        "IdDisciplina").GetInt32(),
+
+                    registro.GetProperty(
+                        "CodigoDisciplina").GetString(),
+
+                    registro.GetProperty(
+                        "NomeDisciplina").GetString(),
+
+                    registro.GetProperty(
+                        "CargaHoraria").GetInt32(),
+
+                    registro.GetProperty(
+                        "Ativa").GetBoolean());
+            }
+
+            // Preserva a pesquisa e a ordenação original.
+            DataTable filtrada = tabela.Clone();
+
+            foreach (DataRow linha in
+                tabela.Select("", "CodigoDisciplina ASC"))
+            {
+                string codigo =
+                    Convert.ToString(
+                        linha["CodigoDisciplina"]) ?? "";
+
+                string nome =
+                    Convert.ToString(
+                        linha["NomeDisciplina"]) ?? "";
+
+                bool correspondePesquisa =
+                    string.IsNullOrEmpty(pesquisa) ||
+
+                    codigo.Contains(
+                        pesquisa,
+                        StringComparison.OrdinalIgnoreCase) ||
+
+                    nome.Contains(
+                        pesquisa,
+                        StringComparison.OrdinalIgnoreCase);
+
+                if (correspondePesquisa)
+                {
+                    filtrada.ImportRow(linha);
+                }
+            }
+
+            return filtrada;
         }
     }
 }

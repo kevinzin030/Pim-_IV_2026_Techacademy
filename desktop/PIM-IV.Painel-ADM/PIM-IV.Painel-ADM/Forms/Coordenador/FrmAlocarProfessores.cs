@@ -1,25 +1,33 @@
 ﻿using System;
 using System.Data;
 using System.Drawing;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using Microsoft.Data.SqlClient;
 using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Servicos;
 
 namespace PIM_IV.Painel_ADM.Forms
 {
-    // Gerencia a alocação e a substituição de professores nas disciplinas.
+    // Gerencia a alocação e a substituição de professores pela API.
     public class FrmAlocarProfessores : Form
     {
         private const int PerfilCoordenador = 2;
-        private const string PermissaoAlocarProfessores = "ALOCAR_PROFESSORES";
+
+        private const string PermissaoAlocarProfessores =
+            "ALOCAR_PROFESSORES";
 
         private readonly Usuario _usuario;
         private readonly PermissaoService _permissaoService = new();
 
-        private readonly Color _corAzul = Color.FromArgb(40, 92, 170);
-        private readonly Color _corFundo = Color.FromArgb(244, 247, 251);
+        private readonly Color _corAzul =
+            Color.FromArgb(40, 92, 170);
+
+        private readonly Color _corFundo =
+            Color.FromArgb(244, 247, 251);
 
         private ComboBox cmbTurma = null!;
         private ComboBox cmbDisciplina = null!;
@@ -39,6 +47,11 @@ namespace PIM_IV.Painel_ADM.Forms
 
         private ContextMenuStrip menuAcoes = null!;
 
+        private readonly System.Windows.Forms.Timer _timerPesquisa = new()
+        {
+            Interval = 450
+        };
+
         private bool _atualizandoDados;
         private int _idAlocacaoSelecionada;
 
@@ -53,6 +66,13 @@ namespace PIM_IV.Painel_ADM.Forms
             ConfigurarEventos();
 
             Shown += AoExibirFormulario;
+
+            FormClosed += (_, _) =>
+            {
+                _timerPesquisa.Stop();
+                _timerPesquisa.Dispose();
+                menuAcoes.Dispose();
+            };
         }
 
         // Define as propriedades visuais da janela.
@@ -69,7 +89,9 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Valida o acesso antes de consultar os dados.
-        private void AoExibirFormulario(object? sender, EventArgs e)
+        private void AoExibirFormulario(
+            object? sender,
+            EventArgs e)
         {
             if (!VerificarAcesso())
             {
@@ -80,7 +102,7 @@ namespace PIM_IV.Painel_ADM.Forms
             AtualizarDados();
         }
 
-        // Verifica se o usuário possui autorização para o módulo.
+        // Verifica a autorização do coordenador.
         private bool VerificarAcesso()
         {
             try
@@ -105,22 +127,6 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 MostrarErro("Erro de autorização", ex);
                 return false;
-            }
-        }
-
-        // Impede alterações realizadas por usuários não autorizados.
-        private void ExigirAutorizacao()
-        {
-            bool autorizado =
-                _usuario.IdPerfil == PerfilCoordenador &&
-                _permissaoService.UsuarioTemPermissao(
-                    _usuario,
-                    PermissaoAlocarProfessores);
-
-            if (!autorizado)
-            {
-                throw new UnauthorizedAccessException(
-                    "Você não possui permissão para alterar alocações.");
             }
         }
 
@@ -163,7 +169,10 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 Text = "Alocação de Professores",
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 21, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    21,
+                    FontStyle.Bold),
                 ForeColor = _corAzul,
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -178,7 +187,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria os campos utilizados para selecionar uma alocação.
-        private void CriarAreaSelecao(TableLayoutPanel principal)
+        private void CriarAreaSelecao(
+            TableLayoutPanel principal)
         {
             TableLayoutPanel cadastro = new()
             {
@@ -193,7 +203,9 @@ namespace PIM_IV.Painel_ADM.Forms
             for (int indice = 0; indice < 3; indice++)
             {
                 cadastro.ColumnStyles.Add(
-                    new ColumnStyle(SizeType.Percent, 33.333f));
+                    new ColumnStyle(
+                        SizeType.Percent,
+                        33.333f));
             }
 
             cadastro.RowStyles.Add(
@@ -238,7 +250,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria o campo de pesquisa das alocações.
-        private void CriarAreaPesquisa(TableLayoutPanel principal)
+        private void CriarAreaPesquisa(
+            TableLayoutPanel principal)
         {
             TableLayoutPanel pesquisa = CriarPainelHorizontal(
                 95,
@@ -250,17 +263,20 @@ namespace PIM_IV.Painel_ADM.Forms
             txtPesquisa = new TextBox
             {
                 Dock = DockStyle.Fill,
+                MaxLength = 150,
                 PlaceholderText =
                     "Pesquisar por turma, disciplina, professor ou RP...",
                 Margin = new Padding(5, 3, 0, 3)
             };
 
             pesquisa.Controls.Add(txtPesquisa, 1, 0);
+
             principal.Controls.Add(pesquisa, 0, 2);
         }
 
         // Cria o filtro independente de turmas.
-        private void CriarAreaFiltroTurma(TableLayoutPanel principal)
+        private void CriarAreaFiltroTurma(
+            TableLayoutPanel principal)
         {
             TableLayoutPanel filtro = CriarPainelHorizontal(
                 155,
@@ -275,6 +291,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 new Padding(5, 3, 0, 3);
 
             filtro.Controls.Add(cmbFiltroTurma, 1, 0);
+
             principal.Controls.Add(filtro, 0, 3);
         }
 
@@ -307,16 +324,15 @@ namespace PIM_IV.Painel_ADM.Forms
             return painel;
         }
 
-        // Cria a tabela e os indicadores de seleção.
-        private void CriarAreaTabela(TableLayoutPanel principal)
+        // Cria a tabela de alocações e seus indicadores.
+        private void CriarAreaTabela(
+            TableLayoutPanel principal)
         {
             TableLayoutPanel areaTabela = new()
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 3,
-                Padding = new Padding(15),
-                BackColor = Color.White,
                 Margin = Padding.Empty
             };
 
@@ -394,7 +410,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria os botões de navegação e operações.
-        private void CriarAreaAcoes(TableLayoutPanel principal)
+        private void CriarAreaAcoes(
+            TableLayoutPanel principal)
         {
             FlowLayoutPanel botoes = new()
             {
@@ -442,7 +459,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 SubstituirProfessor);
         }
 
-        // Evita repetir a criação de itens do menu.
+        // Adiciona uma operação ao menu.
         private void AdicionarAcao(
             string texto,
             Action acao)
@@ -486,16 +503,25 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 if (!_atualizandoDados)
                 {
+                    _timerPesquisa.Stop();
                     CarregarAlocacoes();
                 }
             };
 
+            // Aguarda o término da digitação antes de consultar a API.
             txtPesquisa.TextChanged += (_, _) =>
             {
                 if (!_atualizandoDados)
                 {
-                    CarregarAlocacoes();
+                    _timerPesquisa.Stop();
+                    _timerPesquisa.Start();
                 }
+            };
+
+            _timerPesquisa.Tick += (_, _) =>
+            {
+                _timerPesquisa.Stop();
+                CarregarAlocacoes();
             };
 
             dgvAlocacoes.SelectionChanged += (_, _) =>
@@ -519,7 +545,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 Text = texto,
                 Dock = DockStyle.Fill,
                 ForeColor = _corAzul,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    10,
+                    FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft
             };
         }
@@ -536,7 +565,9 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Cria botões com a aparência do sistema.
-        private Button CriarBotao(string texto, int largura)
+        private Button CriarBotao(
+            string texto,
+            int largura)
         {
             Button botao = new()
             {
@@ -553,28 +584,13 @@ namespace PIM_IV.Painel_ADM.Forms
             botao.FlatAppearance.BorderSize = 0;
 
             botao.MouseEnter += (_, _) =>
-                botao.BackColor = Color.FromArgb(30, 75, 145);
+                botao.BackColor =
+                    Color.FromArgb(30, 75, 145);
 
             botao.MouseLeave += (_, _) =>
                 botao.BackColor = _corAzul;
 
             return botao;
-        }
-
-        // Executa consultas que não precisam de parâmetros.
-        private static DataTable ConsultarTabela(
-            SqlConnection conexao,
-            string sql)
-        {
-            using SqlCommand comando = new(sql, conexao);
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
-
-            DataTable tabela = new();
-            tabela.Load(leitor);
-
-            return tabela;
         }
 
         // Associa uma tabela a um campo de seleção.
@@ -589,27 +605,91 @@ namespace PIM_IV.Painel_ADM.Forms
             combo.DataSource = dados;
         }
 
-        // Atualiza as turmas, os professores e o filtro.
+        // Converte as opções recebidas da API em uma tabela.
+        private static DataTable ConverterOpcoes(
+            JsonElement registros,
+            string campoIdentificador)
+        {
+            DataTable tabela = new();
+
+            tabela.Columns.Add(
+                campoIdentificador,
+                typeof(int));
+
+            tabela.Columns.Add(
+                "Descricao",
+                typeof(string));
+
+            foreach (
+                JsonElement registro in
+                registros.EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty(
+                        campoIdentificador).GetInt32(),
+
+                    registro.GetProperty(
+                        "Descricao").GetString()
+                            ?? string.Empty);
+            }
+
+            return tabela;
+        }
+
+        // Atualiza as turmas, professores e filtros pela API.
         private void AtualizarDados()
         {
+            _timerPesquisa.Stop();
+
             int filtroAnterior = ObterId(cmbFiltroTurma);
 
             try
             {
                 _atualizandoDados = true;
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Get,
+                    "alocacoes/opcoes");
 
-                conexao.Open();
+                DataTable turmas = ConverterOpcoes(
+                    resposta.GetProperty("turmas"),
+                    "IdTurma");
 
-                CarregarTurmas(conexao);
-                CarregarProfessores(conexao);
-                CarregarFiltroTurmas(conexao, filtroAnterior);
+                DataTable professores = ConverterOpcoes(
+                    resposta.GetProperty("professores"),
+                    "IdProfessor");
+
+                DataTable filtroTurmas = ConverterOpcoes(
+                    resposta.GetProperty("filtroTurmas"),
+                    "IdTurma");
+
+                ConfigurarCombo(
+                    cmbTurma,
+                    turmas,
+                    "Descricao",
+                    "IdTurma");
+
+                ConfigurarCombo(
+                    cmbProfessor,
+                    professores,
+                    "Descricao",
+                    "IdProfessor");
+
+                cmbTurma.SelectedIndex =
+                    cmbTurma.Items.Count > 0 ? 0 : -1;
+
+                cmbProfessor.SelectedIndex = -1;
+
+                ConfigurarFiltroTurmas(
+                    filtroTurmas,
+                    filtroAnterior);
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao carregar dados", ex);
+                MostrarErro(
+                    "Erro ao carregar dados",
+                    ex);
+
                 return;
             }
             finally
@@ -622,76 +702,11 @@ namespace PIM_IV.Painel_ADM.Forms
             LimparSelecao();
         }
 
-        // Consulta as turmas ativas.
-        private void CarregarTurmas(SqlConnection conexao)
-        {
-            const string sql = @"
-                SELECT
-                    IdTurma,
-                    CodigoTurma + N' - ' +
-                        NomeTurma AS Descricao
-                FROM dbo.Turmas
-                WHERE Ativa = 1
-                ORDER BY CodigoTurma";
-
-            DataTable turmas = ConsultarTabela(conexao, sql);
-
-            ConfigurarCombo(
-                cmbTurma,
-                turmas,
-                "Descricao",
-                "IdTurma");
-
-            cmbTurma.SelectedIndex =
-                cmbTurma.Items.Count > 0 ? 0 : -1;
-        }
-
-        // Consulta os professores com contas ativas.
-        private void CarregarProfessores(SqlConnection conexao)
-        {
-            const string sql = @"
-                SELECT
-                    p.IdProfessor,
-                    p.RegistroProfessor + N' - ' +
-                        u.NomeCompleto AS Descricao
-                FROM dbo.Professores p
-                INNER JOIN dbo.Usuarios u
-                    ON u.IdUsuario = p.IdUsuario
-                WHERE u.Ativo = 1
-                ORDER BY u.NomeCompleto";
-
-            DataTable professores =
-                ConsultarTabela(conexao, sql);
-
-            ConfigurarCombo(
-                cmbProfessor,
-                professores,
-                "Descricao",
-                "IdProfessor");
-
-            cmbProfessor.SelectedIndex = -1;
-        }
-
-        // Consulta todas as turmas para o filtro.
-        private void CarregarFiltroTurmas(
-            SqlConnection conexao,
+        // Configura o filtro com a opção de todas as turmas.
+        private void ConfigurarFiltroTurmas(
+            DataTable turmas,
             int filtroAnterior)
         {
-            const string sql = @"
-                SELECT
-                    IdTurma,
-                    CodigoTurma + N' - ' +
-                        NomeTurma +
-                        CASE
-                            WHEN Ativa = 0
-                            THEN N' (Inativa)'
-                            ELSE N''
-                        END AS Descricao
-                FROM dbo.Turmas
-                ORDER BY CodigoTurma";
-
-            DataTable turmas = ConsultarTabela(conexao, sql);
-
             DataRow todasTurmas = turmas.NewRow();
 
             todasTurmas["IdTurma"] = 0;
@@ -714,7 +729,8 @@ namespace PIM_IV.Painel_ADM.Forms
         }
 
         // Consulta as disciplinas vinculadas à turma selecionada.
-        private void CarregarDisciplinas()
+        private void CarregarDisciplinas(
+            bool consultarResponsavel = true)
         {
             int idTurma = ObterId(cmbTurma);
 
@@ -722,42 +738,25 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 _atualizandoDados = true;
 
-                const string sql = @"
-                    SELECT
-                        td.IdTurmaDisciplina,
-                        d.CodigoDisciplina + N' - ' +
-                            d.NomeDisciplina AS Descricao
-                    FROM dbo.TurmaDisciplinas td
-                    INNER JOIN dbo.Disciplinas d
-                        ON d.IdDisciplina = td.IdDisciplina
-                    WHERE td.IdTurma = @IdTurma
-                      AND td.Ativa = 1
-                      AND d.Ativa = 1
-                    ORDER BY d.NomeDisciplina";
+                // Limpa os dados anteriores para evitar seleções inválidas.
+                cmbDisciplina.DataSource = null;
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                if (idTurma > 0)
+                {
+                    JsonElement resposta = ExecutarApi(
+                        HttpMethod.Get,
+                        $"alocacoes/turmas/{idTurma}/disciplinas");
 
-                using SqlCommand comando =
-                    new(sql, conexao);
+                    DataTable disciplinas = ConverterOpcoes(
+                        resposta.GetProperty("disciplinas"),
+                        "IdTurmaDisciplina");
 
-                comando.Parameters.Add(
-                    "@IdTurma",
-                    SqlDbType.Int).Value = idTurma;
-
-                conexao.Open();
-
-                using SqlDataReader leitor =
-                    comando.ExecuteReader();
-
-                DataTable disciplinas = new();
-                disciplinas.Load(leitor);
-
-                ConfigurarCombo(
-                    cmbDisciplina,
-                    disciplinas,
-                    "Descricao",
-                    "IdTurmaDisciplina");
+                    ConfigurarCombo(
+                        cmbDisciplina,
+                        disciplinas,
+                        "Descricao",
+                        "IdTurmaDisciplina");
+                }
             }
             catch (Exception ex)
             {
@@ -770,7 +769,10 @@ namespace PIM_IV.Painel_ADM.Forms
                 _atualizandoDados = false;
             }
 
-            AtualizarResponsavel();
+            if (consultarResponsavel)
+            {
+                AtualizarResponsavel();
+            }
         }
 
         // Obtém o identificador selecionado.
@@ -796,31 +798,12 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                const string sql = @"
-                    SELECT
-                        p.RegistroProfessor + N' - ' +
-                            u.NomeCompleto
-                    FROM dbo.AlocacoesProfessores ap
-                    INNER JOIN dbo.Professores p
-                        ON p.IdProfessor = ap.IdProfessor
-                    INNER JOIN dbo.Usuarios u
-                        ON u.IdUsuario = p.IdUsuario
-                    WHERE ap.IdTurmaDisciplina = @IdVinculo";
-
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
-
-                using SqlCommand comando =
-                    new(sql, conexao);
-
-                comando.Parameters.Add(
-                    "@IdVinculo",
-                    SqlDbType.Int).Value = idVinculo;
-
-                conexao.Open();
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Get,
+                    $"alocacoes/vinculos/{idVinculo}/responsavel");
 
                 string? responsavel =
-                    comando.ExecuteScalar()?.ToString();
+                    resposta.GetProperty("responsavel").GetString();
 
                 lblResponsavel.Text =
                     string.IsNullOrWhiteSpace(responsavel)
@@ -829,6 +812,9 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
+                lblResponsavel.Text =
+                    "Não foi possível consultar o responsável.";
+
                 MostrarErro(
                     "Erro ao consultar responsável",
                     ex);
@@ -847,70 +833,21 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 _atualizandoDados = true;
 
-                const string sql = @"
-                    SELECT
-                        ap.IdAlocacao,
-                        ap.IdProfessor,
-                        ap.IdTurmaDisciplina,
-                        td.IdTurma,
-                        t.CodigoTurma AS Turma,
-                        d.NomeDisciplina AS Disciplina,
-                        p.RegistroProfessor AS RP,
-                        u.NomeCompleto AS Professor,
-                        ap.DataAlocacao
-                    FROM dbo.AlocacoesProfessores ap
-                    INNER JOIN dbo.TurmaDisciplinas td
-                        ON td.IdTurmaDisciplina =
-                            ap.IdTurmaDisciplina
-                    INNER JOIN dbo.Turmas t
-                        ON t.IdTurma = td.IdTurma
-                    INNER JOIN dbo.Disciplinas d
-                        ON d.IdDisciplina = td.IdDisciplina
-                    INNER JOIN dbo.Professores p
-                        ON p.IdProfessor = ap.IdProfessor
-                    INNER JOIN dbo.Usuarios u
-                        ON u.IdUsuario = p.IdUsuario
-                    WHERE
-                        (@IdTurma = 0 OR td.IdTurma = @IdTurma)
-                        AND
-                        (
-                            @Pesquisa = N''
-                            OR t.CodigoTurma LIKE
-                                N'%' + @Pesquisa + N'%'
-                            OR d.NomeDisciplina LIKE
-                                N'%' + @Pesquisa + N'%'
-                            OR u.NomeCompleto LIKE
-                                N'%' + @Pesquisa + N'%'
-                            OR p.RegistroProfessor LIKE
-                                N'%' + @Pesquisa + N'%'
-                        )
-                    ORDER BY
-                        t.CodigoTurma,
-                        d.NomeDisciplina";
+                int idTurma = ObterId(cmbFiltroTurma);
 
-                using SqlConnection conexao =
-                    Conexao.CriarConexao();
+                string pesquisa = Uri.EscapeDataString(
+                    txtPesquisa.Text.Trim());
 
-                using SqlCommand comando =
-                    new(sql, conexao);
+                string rota =
+                    $"alocacoes?idTurma={idTurma}" +
+                    $"&pesquisa={pesquisa}";
 
-                comando.Parameters.Add(
-                    "@Pesquisa",
-                    SqlDbType.NVarChar,
-                    150).Value = txtPesquisa.Text.Trim();
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Get,
+                    rota);
 
-                comando.Parameters.Add(
-                    "@IdTurma",
-                    SqlDbType.Int).Value =
-                        ObterId(cmbFiltroTurma);
-
-                conexao.Open();
-
-                using SqlDataReader leitor =
-                    comando.ExecuteReader();
-
-                DataTable alocacoes = new();
-                alocacoes.Load(leitor);
+                DataTable alocacoes = ConverterAlocacoes(
+                    resposta.GetProperty("alocacoes"));
 
                 AtualizarTabela(alocacoes);
             }
@@ -924,6 +861,84 @@ namespace PIM_IV.Painel_ADM.Forms
             {
                 _atualizandoDados = false;
             }
+        }
+
+        // Converte os registros retornados pela API.
+        private static DataTable ConverterAlocacoes(
+            JsonElement registros)
+        {
+            DataTable tabela = new();
+
+            tabela.Columns.Add(
+                "IdAlocacao",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "IdProfessor",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "IdTurmaDisciplina",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "IdTurma",
+                typeof(int));
+
+            tabela.Columns.Add(
+                "Turma",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Disciplina",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "RP",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "Professor",
+                typeof(string));
+
+            tabela.Columns.Add(
+                "DataAlocacao",
+                typeof(DateTime));
+
+            foreach (
+                JsonElement registro in
+                registros.EnumerateArray())
+            {
+                tabela.Rows.Add(
+                    registro.GetProperty(
+                        "IdAlocacao").GetInt32(),
+
+                    registro.GetProperty(
+                        "IdProfessor").GetInt32(),
+
+                    registro.GetProperty(
+                        "IdTurmaDisciplina").GetInt32(),
+
+                    registro.GetProperty(
+                        "IdTurma").GetInt32(),
+
+                    registro.GetProperty(
+                        "Turma").GetString(),
+
+                    registro.GetProperty(
+                        "Disciplina").GetString(),
+
+                    registro.GetProperty(
+                        "RP").GetString(),
+
+                    registro.GetProperty(
+                        "Professor").GetString(),
+
+                    registro.GetProperty(
+                        "DataAlocacao").GetDateTime());
+            }
+
+            return tabela;
         }
 
         // Atualiza a tabela e seus indicadores.
@@ -967,6 +982,7 @@ namespace PIM_IV.Painel_ADM.Forms
             DefinirCabecalho("Disciplina", "Disciplina");
             DefinirCabecalho("RP", "RP");
             DefinirCabecalho("Professor", "Professor");
+
             DefinirCabecalho(
                 "DataAlocacao",
                 "Data da alocação");
@@ -974,7 +990,8 @@ namespace PIM_IV.Painel_ADM.Forms
             if (dgvAlocacoes.Columns.Contains("DataAlocacao"))
             {
                 dgvAlocacoes.Columns["DataAlocacao"]!
-                    .DefaultCellStyle.Format = "dd/MM/yyyy HH:mm";
+                    .DefaultCellStyle.Format =
+                        "dd/MM/yyyy HH:mm";
             }
         }
 
@@ -1016,7 +1033,7 @@ namespace PIM_IV.Painel_ADM.Forms
                 int idProfessor = Convert.ToInt32(
                     linha.Cells["IdProfessor"].Value);
 
-                // Seleciona a turma antes de carregar suas disciplinas.
+                // Seleciona a turma antes de consultar as disciplinas.
                 _atualizandoDados = true;
 
                 try
@@ -1028,7 +1045,8 @@ namespace PIM_IV.Painel_ADM.Forms
                     _atualizandoDados = false;
                 }
 
-                CarregarDisciplinas();
+                // Evita consultar o responsável antes da seleção correta.
+                CarregarDisciplinas(false);
 
                 _atualizandoDados = true;
 
@@ -1102,7 +1120,9 @@ namespace PIM_IV.Painel_ADM.Forms
             int idVinculo = ObterId(cmbDisciplina);
             int idProfessor = ObterId(cmbProfessor);
 
-            if (!ValidarSelecao(idVinculo, idProfessor))
+            if (!ValidarSelecao(
+                idVinculo,
+                idProfessor))
             {
                 return;
             }
@@ -1116,31 +1136,19 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                ExecutarTransacao(
-                    (conexao, transacao) =>
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Post,
+                    "alocacoes",
+                    new
                     {
-                        ValidarDados(
-                            conexao,
-                            transacao,
-                            idVinculo,
-                            idProfessor);
-
-                        InserirAlocacao(
-                            conexao,
-                            transacao,
-                            idVinculo,
-                            idProfessor);
-
-                        RegistrarAuditoria(
-                            conexao,
-                            transacao,
-                            "ALOCAR_PROFESSOR",
-                            $"Professor {idProfessor} alocado " +
-                            $"ao vínculo {idVinculo}.");
+                        idVinculo,
+                        idProfessor
                     });
 
                 ExibirMensagem(
-                    "Professor alocado com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Professor alocado com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
@@ -1148,68 +1156,28 @@ namespace PIM_IV.Painel_ADM.Forms
             }
             catch (Exception ex)
             {
-                MostrarErro("Erro ao alocar professor", ex);
+                MostrarErro(
+                    "Erro ao alocar professor",
+                    ex);
             }
         }
 
-        // Impede alocações duplicadas para a mesma disciplina.
-        private static void InserirAlocacao(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idVinculo,
-            int idProfessor)
-        {
-            const string sql = @"
-                IF EXISTS
-                (
-                    SELECT 1
-                    FROM dbo.AlocacoesProfessores
-                         WITH (UPDLOCK, HOLDLOCK)
-                    WHERE IdTurmaDisciplina = @IdVinculo
-                )
-                BEGIN
-                    THROW 51001,
-                        'Esta disciplina já possui professor responsável. Utilize Substituir professor.',
-                        1;
-                END;
-
-                INSERT INTO dbo.AlocacoesProfessores
-                (
-                    IdProfessor,
-                    IdTurmaDisciplina,
-                    DataAlocacao
-                )
-                VALUES
-                (
-                    @IdProfessor,
-                    @IdVinculo,
-                    SYSDATETIME()
-                );";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            AdicionarParametrosAlocacao(
-                comando,
-                idVinculo,
-                idProfessor);
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Substitui o professor e preserva o histórico anterior.
+        // Substitui o professor responsável pela disciplina.
         private void SubstituirProfessor()
         {
             int idVinculo = ObterId(cmbDisciplina);
-            int idProfessorNovo = ObterId(cmbProfessor);
+            int idProfessor = ObterId(cmbProfessor);
 
-            if (!ValidarSelecao(idVinculo, idProfessorNovo))
+            if (!ValidarSelecao(
+                idVinculo,
+                idProfessor))
             {
                 return;
             }
 
             if (!ConfirmarOperacao(
-                "Substituir o professor responsável por esta disciplina?",
+                "Deseja substituir o professor responsável?\n\n" +
+                "O vínculo anterior será preservado no histórico.",
                 "Confirmar substituição"))
             {
                 return;
@@ -1217,53 +1185,18 @@ namespace PIM_IV.Painel_ADM.Forms
 
             try
             {
-                ExecutarTransacao(
-                    (conexao, transacao) =>
+                JsonElement resposta = ExecutarApi(
+                    HttpMethod.Put,
+                    $"alocacoes/vinculos/{idVinculo}",
+                    new
                     {
-                        ValidarDados(
-                            conexao,
-                            transacao,
-                            idVinculo,
-                            idProfessorNovo);
-
-                        AlocacaoAnterior anterior =
-                            ConsultarAlocacaoAnterior(
-                                conexao,
-                                transacao,
-                                idVinculo);
-
-                        if (anterior.IdProfessor == idProfessorNovo)
-                        {
-                            throw new InvalidOperationException(
-                                "O professor selecionado já é o responsável " +
-                                "por esta disciplina.");
-                        }
-
-                        RegistrarHistoricoSubstituicao(
-                            conexao,
-                            transacao,
-                            anterior,
-                            idVinculo);
-
-                        AtualizarProfessorResponsavel(
-                            conexao,
-                            transacao,
-                            anterior.IdAlocacao,
-                            idVinculo,
-                            idProfessorNovo);
-
-                        RegistrarAuditoria(
-                            conexao,
-                            transacao,
-                            "SUBSTITUIR_PROFESSOR",
-                            $"Vínculo {idVinculo}: professor anterior " +
-                            $"{anterior.IdProfessor}, novo professor " +
-                            $"{idProfessorNovo}. " +
-                            $"Alocação {anterior.IdAlocacao}.");
+                        idProfessor
                     });
 
                 ExibirMensagem(
-                    "Professor substituído com sucesso!",
+                    ObterMensagem(
+                        resposta,
+                        "Professor substituído com sucesso!"),
                     "Sucesso",
                     MessageBoxIcon.Information);
 
@@ -1277,266 +1210,85 @@ namespace PIM_IV.Painel_ADM.Forms
             }
         }
 
-        // Recupera a alocação atual com bloqueio para atualização.
-        private static AlocacaoAnterior ConsultarAlocacaoAnterior(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idVinculo)
-        {
-            const string sql = @"
-                SELECT
-                    IdAlocacao,
-                    IdProfessor,
-                    DataAlocacao
-                FROM dbo.AlocacoesProfessores
-                     WITH (UPDLOCK, HOLDLOCK)
-                WHERE IdTurmaDisciplina = @IdVinculo";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdVinculo",
-                SqlDbType.Int).Value = idVinculo;
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
-
-            if (!leitor.Read())
-            {
-                throw new InvalidOperationException(
-                    "Esta disciplina ainda não possui professor responsável. " +
-                    "Utilize Alocar professor.");
-            }
-
-            return new AlocacaoAnterior(
-                leitor.GetInt32(0),
-                leitor.GetInt32(1),
-                leitor.GetDateTime(2));
-        }
-
-        // Preserva os dados do professor antes da substituição.
-        private static void RegistrarHistoricoSubstituicao(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            AlocacaoAnterior anterior,
-            int idVinculo)
-        {
-            const string sql = @"
-                INSERT INTO dbo.HistoricoAlocacoesProfessores
-                (
-                    IdAlocacaoOriginal,
-                    IdProfessor,
-                    IdTurmaDisciplina,
-                    DataAlocacao,
-                    EstavaAtiva
-                )
-                VALUES
-                (
-                    @IdAlocacao,
-                    @IdProfessorAnterior,
-                    @IdVinculo,
-                    @DataAnterior,
-                    1
-                );";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdAlocacao",
-                SqlDbType.Int).Value = anterior.IdAlocacao;
-
-            comando.Parameters.Add(
-                "@IdProfessorAnterior",
-                SqlDbType.Int).Value = anterior.IdProfessor;
-
-            comando.Parameters.Add(
-                "@IdVinculo",
-                SqlDbType.Int).Value = idVinculo;
-
-            comando.Parameters.Add(
-                "@DataAnterior",
-                SqlDbType.DateTime2).Value =
-                    anterior.DataAlocacao;
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Atualiza o professor responsável sem recriar a alocação.
-        private static void AtualizarProfessorResponsavel(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idAlocacao,
-            int idVinculo,
-            int idProfessorNovo)
-        {
-            const string sql = @"
-                UPDATE dbo.AlocacoesProfessores
-                SET
-                    IdProfessor = @IdProfessorNovo,
-                    DataAlocacao = SYSDATETIME()
-                WHERE IdAlocacao = @IdAlocacao
-                  AND IdTurmaDisciplina = @IdVinculo";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            comando.Parameters.Add(
-                "@IdProfessorNovo",
-                SqlDbType.Int).Value = idProfessorNovo;
-
-            comando.Parameters.Add(
-                "@IdAlocacao",
-                SqlDbType.Int).Value = idAlocacao;
-
-            comando.Parameters.Add(
-                "@IdVinculo",
-                SqlDbType.Int).Value = idVinculo;
-
-            if (comando.ExecuteNonQuery() != 1)
-            {
-                throw new InvalidOperationException(
-                    "Não foi possível atualizar a alocação.");
-            }
-        }
-
-        // Valida a disponibilidade da turma, disciplina e professor.
-        private static void ValidarDados(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idVinculo,
-            int idProfessor)
-        {
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.TurmaDisciplinas td
-                INNER JOIN dbo.Turmas t
-                    ON t.IdTurma = td.IdTurma
-                INNER JOIN dbo.Disciplinas d
-                    ON d.IdDisciplina = td.IdDisciplina
-                INNER JOIN dbo.Professores p
-                    ON p.IdProfessor = @IdProfessor
-                INNER JOIN dbo.Usuarios u
-                    ON u.IdUsuario = p.IdUsuario
-                WHERE td.IdTurmaDisciplina = @IdVinculo
-                  AND td.Ativa = 1
-                  AND t.Ativa = 1
-                  AND d.Ativa = 1
-                  AND u.Ativo = 1";
-
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
-
-            AdicionarParametrosAlocacao(
-                comando,
-                idVinculo,
-                idProfessor);
-
-            bool dadosValidos =
-                Convert.ToInt32(comando.ExecuteScalar()) > 0;
-
-            if (!dadosValidos)
-            {
-                throw new InvalidOperationException(
-                    "O professor ou a turma/disciplina não está " +
-                    "disponível para alocação.");
-            }
-        }
-
-        // Centraliza os parâmetros utilizados nas alocações.
-        private static void AdicionarParametrosAlocacao(
-            SqlCommand comando,
-            int idVinculo,
-            int idProfessor)
-        {
-            comando.Parameters.Add(
-                "@IdVinculo",
-                SqlDbType.Int).Value = idVinculo;
-
-            comando.Parameters.Add(
-                "@IdProfessor",
-                SqlDbType.Int).Value = idProfessor;
-        }
-
-        // Executa alterações e auditoria em uma única transação.
-        private void ExecutarTransacao(
-            Action<SqlConnection, SqlTransaction> operacao)
-        {
-            ExigirAutorizacao();
-
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            conexao.Open();
-
-            using SqlTransaction transacao =
-                conexao.BeginTransaction(
-                    IsolationLevel.Serializable);
-
-            try
-            {
-                operacao(conexao, transacao);
-
-                transacao.Commit();
-            }
-            catch
-            {
-                if (transacao.Connection != null)
-                {
-                    transacao.Rollback();
-                }
-
-                throw;
-            }
-        }
-
-        // Atualiza a consulta após uma operação concluída.
+        // Atualiza os dados após uma operação concluída.
         private void AtualizarConsultaAposOperacao()
         {
             AtualizarResponsavel();
             CarregarAlocacoes();
         }
 
-        // Registra a atividade na mesma transação da alteração.
-        private void RegistrarAuditoria(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            string acao,
-            string descricao)
+        // Executa requisições utilizando o token da sessão.
+        private static JsonElement ExecutarApi(
+            HttpMethod metodo,
+            string rota,
+            object? corpo = null)
         {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
+            return Task.Run(async () =>
+            {
+                using HttpRequestMessage requisicao =
+                    new(metodo, rota);
 
-            using SqlCommand comando =
-                new(sql, conexao, transacao);
+                if (corpo != null)
+                {
+                    requisicao.Content =
+                        JsonContent.Create(corpo);
+                }
 
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = _usuario.IdUsuario;
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.SendAsync(
+                        requisicao);
 
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = acao;
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
 
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value = descricao;
+                JsonElement resultado;
 
-            comando.ExecuteNonQuery();
+                try
+                {
+                    using JsonDocument documento =
+                        JsonDocument.Parse(conteudo);
+
+                    resultado = documento.RootElement.Clone();
+                }
+                catch (JsonException)
+                {
+                    throw new HttpRequestException(
+                        "A API retornou uma resposta inválida.",
+                        null,
+                        resposta.StatusCode);
+                }
+
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        ObterMensagem(
+                            resultado,
+                            "Não foi possível concluir a operação."),
+                        null,
+                        resposta.StatusCode);
+                }
+
+                return resultado;
+
+            }).GetAwaiter().GetResult();
+        }
+
+        // Obtém a mensagem retornada pela API.
+        private static string ObterMensagem(
+            JsonElement resposta,
+            string mensagemPadrao)
+        {
+            if (resposta.ValueKind == JsonValueKind.Object &&
+                resposta.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem) &&
+                mensagem.ValueKind == JsonValueKind.String)
+            {
+                return mensagem.GetString()
+                    ?? mensagemPadrao;
+            }
+
+            return mensagemPadrao;
         }
 
         // Solicita confirmação antes de modificar uma alocação.
@@ -1573,24 +1325,6 @@ namespace PIM_IV.Painel_ADM.Forms
                 ex.Message,
                 titulo,
                 MessageBoxIcon.Error);
-        }
-
-        // Representa os dados necessários para preservar uma alocação.
-        private sealed class AlocacaoAnterior
-        {
-            public int IdAlocacao { get; }
-            public int IdProfessor { get; }
-            public DateTime DataAlocacao { get; }
-
-            public AlocacaoAnterior(
-                int idAlocacao,
-                int idProfessor,
-                DateTime dataAlocacao)
-            {
-                IdAlocacao = idAlocacao;
-                IdProfessor = idProfessor;
-                DataAlocacao = dataAlocacao;
-            }
         }
     }
 }

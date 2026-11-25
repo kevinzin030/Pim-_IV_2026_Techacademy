@@ -1,164 +1,101 @@
 ﻿using System;
 using System.Data;
-using Microsoft.Data.SqlClient;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 using PIM_IV.Painel_ADM.Data;
+using PIM_IV.Painel_ADM.Seguranca;
 
 namespace PIM_IV.Painel_ADM.Repositorios
 {
-    // Responsável pelo acesso aos registros de auditoria.
+    // Responsável pela consulta dos registros de auditoria pela API.
     public class AuditoriaRepository
     {
-        private const int TamanhoAcao = 100;
-        private const int TamanhoDescricao = 500;
-        private const int TamanhoPesquisa = 200;
-        private const int TamanhoTexto = 450;
+        // Executa consultas autenticadas na API.
+        private static JsonElement ConsultarApi(string rota)
+        {
+            return Task.Run(async () =>
+            {
+                using HttpResponseMessage resposta =
+                    await ApiClient.Cliente.GetAsync(rota);
 
-        // Registra uma atividade realizada por um usuário.
+                string conteudo =
+                    await resposta.Content.ReadAsStringAsync();
+
+                if (!resposta.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        ExtrairMensagem(conteudo));
+                }
+
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                return documento.RootElement.Clone();
+
+            }).GetAwaiter().GetResult();
+        }
+
+        // Recupera a mensagem de erro retornada pela API.
+        private static string ExtrairMensagem(string conteudo)
+        {
+            try
+            {
+                using JsonDocument documento =
+                    JsonDocument.Parse(conteudo);
+
+                if (documento.RootElement.TryGetProperty(
+                    "mensagem",
+                    out JsonElement mensagem))
+                {
+                    return mensagem.GetString()
+                        ?? "Não foi possível consultar a auditoria.";
+                }
+            }
+            catch (JsonException)
+            {
+                // Utiliza a mensagem padrão.
+            }
+
+            return "Não foi possível consultar a auditoria.";
+        }
+
+        // Preserva a assinatura original do serviço.
+        // Os registros são gerados diretamente pelos controllers.
         public void Registrar(
             int idUsuario,
             string acao,
             string descricao)
         {
-            ValidarRegistro(idUsuario, acao, descricao);
-
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                (
-                    IdUsuario,
-                    Acao,
-                    Descricao
-                )
-                VALUES
-                (
-                    @IdUsuario,
-                    @Acao,
-                    @Descricao
-                )";
-
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            using SqlCommand comando =
-                new(sql, conexao);
-
-            AdicionarParametro(
-                comando,
-                "@IdUsuario",
-                SqlDbType.Int,
-                idUsuario);
-
-            AdicionarParametroTexto(
-                comando,
-                "@Acao",
-                acao,
-                TamanhoAcao);
-
-            AdicionarParametroTexto(
-                comando,
-                "@Descricao",
-                descricao,
-                TamanhoDescricao);
-
-            conexao.Open();
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Valida os dados antes de registrar uma atividade.
-        private static void ValidarRegistro(
-            int idUsuario,
-            string acao,
-            string descricao)
-        {
-            if (idUsuario <= 0)
-            {
-                throw new ArgumentException(
-                    "O identificador do usuário é inválido.",
-                    nameof(idUsuario));
-            }
-
-            if (string.IsNullOrWhiteSpace(acao))
-            {
-                throw new ArgumentException(
-                    "A ação da auditoria deve ser informada.",
-                    nameof(acao));
-            }
-
-            if (acao.Length > TamanhoAcao)
-            {
-                throw new ArgumentException(
-                    "A ação ultrapassa o tamanho permitido.",
-                    nameof(acao));
-            }
-
-            if (descricao == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(descricao));
-            }
-
-            if (descricao.Length > TamanhoDescricao)
-            {
-                throw new ArgumentException(
-                    "A descrição ultrapassa o tamanho permitido.",
-                    nameof(descricao));
-            }
+            throw new NotSupportedException(
+                "Os registros de auditoria devem ser gerados pela API.");
         }
 
         // Consulta todos os registros de auditoria.
         public DataTable ListarTodos()
         {
-            const string sql = @"
-                SELECT
-                    l.IdLog,
-                    u.NomeCompleto AS Usuario,
-                    l.Acao,
-                    l.Descricao,
-                    l.DataHora
-                FROM dbo.LogsAtividades l
-                LEFT JOIN dbo.Usuarios u
-                    ON l.IdUsuario = u.IdUsuario
-                ORDER BY
-                    l.DataHora DESC,
-                    l.IdLog DESC";
+            JsonElement resposta = ConsultarApi("auditoria");
 
-            return ExecutarConsulta(sql);
+            return ConverterRegistros(
+                resposta,
+                pesquisa: false);
         }
 
-        // Confirma se o usuário continua sendo administrador ativo.
+        // Confirma a autorização do administrador autenticado.
         public bool AdministradorEstaAutorizado(int idUsuario)
         {
-            if (idUsuario <= 0)
+            if (idUsuario <= 0 ||
+                !SessaoUsuario.EstaAutenticado)
             {
                 return false;
             }
 
-            const string sql = @"
-                SELECT COUNT(1)
-                FROM dbo.Usuarios u
-                INNER JOIN dbo.Perfis p
-                    ON u.IdPerfil = p.IdPerfil
-                WHERE u.IdUsuario = @IdUsuario
-                  AND u.Ativo = 1
-                  AND p.Ativo = 1
-                  AND p.NomePerfil = N'Administrador'";
+            JsonElement resposta =
+                ConsultarApi("auditoria/autorizacao");
 
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            using SqlCommand comando =
-                new(sql, conexao);
-
-            AdicionarParametro(
-                comando,
-                "@IdUsuario",
-                SqlDbType.Int,
-                idUsuario);
-
-            conexao.Open();
-
-            return Convert.ToInt32(
-                comando.ExecuteScalar()) > 0;
+            return resposta
+                .GetProperty("autorizado")
+                .GetBoolean();
         }
 
         // Consulta registros por período e texto pesquisado.
@@ -167,142 +104,119 @@ namespace PIM_IV.Painel_ADM.Repositorios
             DateTime dataFim,
             string pesquisa)
         {
-            ValidarPeriodo(dataInicio, dataFim);
-
-            pesquisa ??= string.Empty;
-
-            pesquisa = pesquisa.Trim();
-
-            if (pesquisa.Length > TamanhoPesquisa)
-            {
-                throw new ArgumentException(
-                    "O texto de pesquisa ultrapassa " +
-                    "o tamanho permitido.",
-                    nameof(pesquisa));
-            }
-
-            const string sql = @"
-                SELECT
-                    l.IdLog,
-                    l.DataHora,
-                    u.Login,
-                    u.NomeCompleto,
-                    l.Acao,
-                    l.Descricao
-                FROM dbo.LogsAtividades l
-                LEFT JOIN dbo.Usuarios u
-                    ON l.IdUsuario = u.IdUsuario
-                WHERE l.DataHora >= @DataInicio
-                  AND l.DataHora < @DataFim
-                  AND
-                  (
-                      @Pesquisa = N''
-                      OR u.Login LIKE @Texto
-                      OR u.NomeCompleto LIKE @Texto
-                      OR l.Acao LIKE @Texto
-                      OR l.Descricao LIKE @Texto
-                  )
-                ORDER BY
-                    l.DataHora DESC,
-                    l.IdLog DESC";
-
-            return ExecutarConsulta(
-                sql,
-                comando =>
-                {
-                    AdicionarParametro(
-                        comando,
-                        "@DataInicio",
-                        SqlDbType.DateTime2,
-                        dataInicio.Date);
-
-                    AdicionarParametro(
-                        comando,
-                        "@DataFim",
-                        SqlDbType.DateTime2,
-                        dataFim.Date.AddDays(1));
-
-                    AdicionarParametroTexto(
-                        comando,
-                        "@Pesquisa",
-                        pesquisa,
-                        TamanhoPesquisa);
-
-                    AdicionarParametroTexto(
-                        comando,
-                        "@Texto",
-                        "%" + pesquisa + "%",
-                        TamanhoTexto);
-                });
-        }
-
-        // Verifica se o período informado é válido.
-        private static void ValidarPeriodo(
-            DateTime dataInicio,
-            DateTime dataFim)
-        {
             if (dataInicio.Date > dataFim.Date)
             {
                 throw new ArgumentException(
-                    "A data inicial não pode ser " +
-                    "posterior à data final.");
+                    "A data inicial não pode ser posterior à data final.");
             }
 
-            if (dataFim.Date >= DateTime.MaxValue.Date)
+            if (dataFim.Date == DateTime.MaxValue.Date)
             {
                 throw new ArgumentException(
                     "A data final informada é inválida.");
             }
+
+            pesquisa = (pesquisa ?? string.Empty).Trim();
+
+            if (pesquisa.Length > 200)
+            {
+                throw new ArgumentException(
+                    "O texto de pesquisa ultrapassa o tamanho permitido.");
+            }
+
+            string textoCodificado =
+                Uri.EscapeDataString(pesquisa);
+
+            string rota =
+                $"auditoria?dataInicio={dataInicio:yyyy-MM-dd}" +
+                $"&dataFim={dataFim:yyyy-MM-dd}" +
+                $"&pesquisa={textoCodificado}";
+
+            JsonElement resposta = ConsultarApi(rota);
+
+            return ConverterRegistros(
+                resposta,
+                pesquisa: true);
         }
 
-        // Executa consultas e retorna os resultados em uma tabela.
-        private static DataTable ExecutarConsulta(
-            string sql,
-            Action<SqlCommand>? configurarParametros = null)
+        // Converte os registros mantendo a estrutura original.
+        private static DataTable ConverterRegistros(
+            JsonElement resposta,
+            bool pesquisa)
         {
-            using SqlConnection conexao =
-                Conexao.CriarConexao();
-
-            using SqlCommand comando =
-                new(sql, conexao);
-
-            configurarParametros?.Invoke(comando);
-
-            conexao.Open();
-
-            using SqlDataReader leitor =
-                comando.ExecuteReader();
-
             DataTable tabela = new();
 
-            tabela.Load(leitor);
+            tabela.Columns.Add("IdLog", typeof(int));
+
+            if (pesquisa)
+            {
+                tabela.Columns.Add("DataHora", typeof(DateTime));
+                tabela.Columns.Add("Login", typeof(string));
+                tabela.Columns.Add("NomeCompleto", typeof(string));
+                tabela.Columns.Add("Acao", typeof(string));
+                tabela.Columns.Add("Descricao", typeof(string));
+            }
+            else
+            {
+                tabela.Columns.Add("Usuario", typeof(string));
+                tabela.Columns.Add("Acao", typeof(string));
+                tabela.Columns.Add("Descricao", typeof(string));
+                tabela.Columns.Add("DataHora", typeof(DateTime));
+            }
+
+            foreach (JsonElement registro in
+                resposta.GetProperty("registros").EnumerateArray())
+            {
+                int idLog =
+                    registro.GetProperty("IdLog").GetInt32();
+
+                DateTime dataHora =
+                    registro.GetProperty("DataHora").GetDateTime();
+
+                string acao =
+                    ObterTexto(registro, "Acao");
+
+                string descricao =
+                    ObterTexto(registro, "Descricao");
+
+                if (pesquisa)
+                {
+                    tabela.Rows.Add(
+                        idLog,
+                        dataHora,
+                        ObterTexto(registro, "Login"),
+                        ObterTexto(registro, "NomeCompleto"),
+                        acao,
+                        descricao);
+                }
+                else
+                {
+                    tabela.Rows.Add(
+                        idLog,
+                        ObterTexto(registro, "Usuario"),
+                        acao,
+                        descricao,
+                        dataHora);
+                }
+            }
 
             return tabela;
         }
 
-        // Adiciona parâmetros tipados às consultas SQL.
-        private static void AdicionarParametro(
-            SqlCommand comando,
-            string nome,
-            SqlDbType tipo,
-            object valor)
+        // Trata campos textuais que podem retornar nulos.
+        private static string ObterTexto(
+            JsonElement registro,
+            string propriedade)
         {
-            comando.Parameters.Add(
-                nome,
-                tipo).Value = valor;
-        }
+            if (registro.TryGetProperty(
+                propriedade,
+                out JsonElement valor) &&
+                valor.ValueKind == JsonValueKind.String)
+            {
+                return valor.GetString() ?? string.Empty;
+            }
 
-        // Adiciona parâmetros de texto com tamanho definido.
-        private static void AdicionarParametroTexto(
-            SqlCommand comando,
-            string nome,
-            string valor,
-            int tamanho)
-        {
-            comando.Parameters.Add(
-                nome,
-                SqlDbType.NVarChar,
-                tamanho).Value = valor;
+            return string.Empty;
         }
     }
 }

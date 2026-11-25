@@ -1,27 +1,26 @@
 using System;
-using System.Data;
 using System.Drawing;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using Microsoft.Data.SqlClient;
-using PIM_IV.Painel_ADM.Data;
 using PIM_IV.Painel_ADM.Modelos;
 using PIM_IV.Painel_ADM.Seguranca;
 using PIM_IV.Painel_ADM.Servicos;
 
 namespace PIM_IV.Painel_ADM
 {
+    /// <summary>
+    /// Gerencia a autenticação e o primeiro acesso
+    /// ao painel administrativo do TechAcademy.
+    /// </summary>
     public partial class FrmLogin : Form
     {
         private const string NomeAdministradorInicial = "Administrador";
         private const string LoginAdministradorInicial = "administrador";
 
-        private const string AcaoAuditoriaTrocaSenha =
-            "ALTERACAO_SENHA_PRIMEIRO_ACESSO";
-
         private readonly AutenticacaoService _autenticacaoService;
         private readonly UsuarioService _usuarioService;
 
-        // Inicializa os serviços e configura os eventos do formulário.
+        // Inicializa os serviços e configura o formulário.
         public FrmLogin()
         {
             InitializeComponent();
@@ -33,15 +32,14 @@ namespace PIM_IV.Painel_ADM
             ConfigurarEventos();
         }
 
-        // Define o comportamento inicial dos campos e botões.
+        // Define o comportamento inicial dos componentes.
         private void ConfigurarFormulario()
         {
             txtSenha.UseSystemPasswordChar = true;
-
             AcceptButton = btnEntrar;
         }
 
-        // Evita inscrições duplicadas nos eventos do formulário.
+        // Configura os eventos sem permitir inscrições duplicadas.
         private void ConfigurarEventos()
         {
             btnEntrar.Click -= btnEntrar_Click;
@@ -54,13 +52,14 @@ namespace PIM_IV.Painel_ADM
             Shown += FrmLogin_Shown;
         }
 
-        // Verifica se o sistema ainda precisa cadastrar o administrador.
+        // Verifica a disponibilidade do cadastro inicial.
         private void FrmLogin_Shown(object? sender, EventArgs e)
         {
             AtualizarDisponibilidadeCadastroInicial();
         }
 
-        // Exibe o cadastro inicial somente quando não existe administrador.
+        // Mantém temporariamente a consulta pelo serviço existente.
+        // Esta operação será migrada posteriormente para a API.
         private void AtualizarDisponibilidadeCadastroInicial()
         {
             btnCadastroInicial.Visible = false;
@@ -72,15 +71,16 @@ namespace PIM_IV.Painel_ADM
             }
             catch (Exception)
             {
-                ExibirMensagem(
-                    "Não foi possível consultar o banco de dados.",
-                    "Erro de conexão",
-                    MessageBoxIcon.Error);
+                // Uma falha no cadastro inicial não deve impedir
+                // a tentativa de autenticação através da API.
+                btnCadastroInicial.Visible = false;
             }
         }
 
-        // Inicia o cadastro do primeiro administrador do sistema.
-        private void btnCadastroInicial_Click(object? sender, EventArgs e)
+        // Inicia o cadastro do primeiro administrador.
+        private void btnCadastroInicial_Click(
+            object? sender,
+            EventArgs e)
         {
             try
             {
@@ -96,7 +96,8 @@ namespace PIM_IV.Painel_ADM
                     return;
                 }
 
-                string? senhaInicial = SolicitarSenhaAdministrador();
+                string? senhaInicial =
+                    SolicitarSenhaAdministrador();
 
                 if (senhaInicial == null)
                 {
@@ -112,23 +113,17 @@ namespace PIM_IV.Painel_ADM
                     "Dados inválidos",
                     MessageBoxIcon.Warning);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
                 ExibirMensagem(
+                    "Não foi possível concluir o cadastro inicial.\n\n" +
                     ex.Message,
-                    "Cadastro não permitido",
-                    MessageBoxIcon.Warning);
-            }
-            catch (Exception)
-            {
-                ExibirMensagem(
-                    "Não foi possível concluir o cadastro inicial.",
                     "Erro no cadastro",
                     MessageBoxIcon.Error);
             }
         }
 
-        // Encaminha o cadastro para o serviço responsável.
+        // Encaminha o cadastro inicial ao serviço responsável.
         private void CadastrarAdministradorInicial(string senha)
         {
             _usuarioService.CadastrarAdministradorInicial(
@@ -148,7 +143,7 @@ namespace PIM_IV.Painel_ADM
                 MessageBoxIcon.Information);
         }
 
-        // Solicita e confirma a senha do administrador inicial.
+        // Solicita a senha do administrador inicial.
         private string? SolicitarSenhaAdministrador()
         {
             using Form janela = new()
@@ -164,25 +159,17 @@ namespace PIM_IV.Painel_ADM
 
             Label lblSenha = CriarRotulo(
                 "Senha (mínimo de 8 caracteres):",
-                20,
-                20,
-                340);
+                20, 20, 340);
 
             TextBox campoSenha = CriarCampoSenha(
-                20,
-                45,
-                340);
+                20, 45, 340);
 
             Label lblConfirmar = CriarRotulo(
                 "Confirmar senha:",
-                20,
-                80,
-                340);
+                20, 80, 340);
 
             TextBox campoConfirmar = CriarCampoSenha(
-                20,
-                105,
-                340);
+                20, 105, 340);
 
             Button btnConfirmar = new()
             {
@@ -218,12 +205,18 @@ namespace PIM_IV.Painel_ADM
             return campoSenha.Text;
         }
 
-        // Executa a autenticação das credenciais informadas.
-        private void btnEntrar_Click(object? sender, EventArgs e)
+        /// <summary>
+        /// Autentica o usuário através da API sem bloquear
+        /// a interface durante a requisição HTTP.
+        /// </summary>
+        private async void btnEntrar_Click(
+            object? sender,
+            EventArgs e)
         {
             string login = txtUsuario.Text.Trim();
             string senha = txtSenha.Text;
 
+            // Valida os campos obrigatórios.
             if (string.IsNullOrWhiteSpace(login) ||
                 string.IsNullOrWhiteSpace(senha))
             {
@@ -237,8 +230,17 @@ namespace PIM_IV.Painel_ADM
 
             try
             {
+                // Impede solicitações simultâneas de autenticação.
+                btnEntrar.Enabled = false;
+                btnCadastroInicial.Enabled = false;
+                txtUsuario.Enabled = false;
+                txtSenha.Enabled = false;
+
+                // Encaminha as credenciais para a API REST.
                 Usuario? usuario =
-                    _autenticacaoService.Autenticar(login, senha);
+                    await _autenticacaoService.AutenticarAsync(
+                        login,
+                        senha);
 
                 if (usuario == null)
                 {
@@ -246,6 +248,8 @@ namespace PIM_IV.Painel_ADM
                     return;
                 }
 
+                // Utiliza a informação retornada pela API
+                // para verificar a alteração obrigatória de senha.
                 if (!VerificarTrocaObrigatoriaSenha(usuario, senha))
                 {
                     return;
@@ -261,9 +265,23 @@ namespace PIM_IV.Painel_ADM
                     "Erro de autenticação",
                     MessageBoxIcon.Error);
             }
+            finally
+            {
+                // Encerra a sessão após falhas ou saída do painel.
+                SessaoUsuario.Encerrar();
+
+                // Restaura os componentes do formulário.
+                btnEntrar.Enabled = true;
+                btnCadastroInicial.Enabled = true;
+                txtUsuario.Enabled = true;
+                txtSenha.Enabled = true;
+
+                txtSenha.Clear();
+                txtSenha.Focus();
+            }
         }
 
-        // Informa a falha de autenticação sem revelar dados da conta.
+        // Informa que as credenciais não foram reconhecidas.
         private void TratarCredenciaisInvalidas()
         {
             ExibirMensagem(
@@ -271,23 +289,23 @@ namespace PIM_IV.Painel_ADM
                 "Verifique suas credenciais e tente novamente.",
                 "Falha na autenticação",
                 MessageBoxIcon.Warning);
-
-            txtSenha.Clear();
-            txtSenha.Focus();
         }
 
-        // Impede o acesso enquanto a senha provisória não for alterada.
+        // Impede o acesso enquanto a senha provisória estiver ativa.
         private bool VerificarTrocaObrigatoriaSenha(
             Usuario usuario,
             string senhaInicial)
         {
-            if (!PrecisaAlterarSenha(usuario.IdUsuario))
+            // A informação agora é recebida diretamente da API.
+            if (!usuario.DeveAlterarSenha)
             {
                 return true;
             }
 
             bool senhaAlterada =
-                ExibirTrocaObrigatoriaSenha(usuario, senhaInicial);
+                ExibirTrocaObrigatoriaSenha(
+                    usuario,
+                    senhaInicial);
 
             txtSenha.Clear();
 
@@ -298,8 +316,6 @@ namespace PIM_IV.Painel_ADM
                     "para acessar o sistema.",
                     "Primeiro acesso",
                     MessageBoxIcon.Warning);
-
-                txtSenha.Focus();
 
                 return false;
             }
@@ -313,7 +329,7 @@ namespace PIM_IV.Painel_ADM
             return true;
         }
 
-        // Abre o painel e restaura a tela de login ao encerrá-lo.
+        // Abre o painel administrativo durante a sessão autenticada.
         private void AbrirPainelPrincipal(Usuario usuario)
         {
             txtSenha.Clear();
@@ -328,6 +344,9 @@ namespace PIM_IV.Painel_ADM
             }
             finally
             {
+                // Remove o token JWT ao encerrar o painel.
+                SessaoUsuario.Encerrar();
+
                 Show();
 
                 txtSenha.Clear();
@@ -335,37 +354,7 @@ namespace PIM_IV.Painel_ADM
             }
         }
 
-        // Consulta no banco se o usuário deve trocar a senha.
-        private static bool PrecisaAlterarSenha(int idUsuario)
-        {
-            const string sql = @"
-                SELECT DeveAlterarSenha
-                FROM dbo.Usuarios
-                WHERE IdUsuario = @IdUsuario
-                  AND Ativo = 1";
-
-            using SqlConnection conexao = Conexao.CriarConexao();
-
-            using SqlCommand comando = new(sql, conexao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = idUsuario;
-
-            conexao.Open();
-
-            object? resultado = comando.ExecuteScalar();
-
-            if (resultado == null || resultado == DBNull.Value)
-            {
-                throw new InvalidOperationException(
-                    "Usuário não encontrado ou desativado.");
-            }
-
-            return Convert.ToBoolean(resultado);
-        }
-
-        // Apresenta o formulário de alteração obrigatória de senha.
+        // Apresenta a janela de alteração obrigatória de senha.
         private bool ExibirTrocaObrigatoriaSenha(
             Usuario usuario,
             string senhaInicial)
@@ -399,7 +388,6 @@ namespace PIM_IV.Painel_ADM
                 Text =
                     "Este é seu primeiro acesso. " +
                     "Crie uma nova senha para continuar.",
-
                 Left = 20,
                 Top = 52,
                 Width = 405,
@@ -408,32 +396,23 @@ namespace PIM_IV.Painel_ADM
 
             Label lblNovaSenha = CriarRotulo(
                 "Nova senha:",
-                20,
-                100,
-                400);
+                20, 100, 400);
 
             TextBox txtNovaSenha = CriarCampoSenha(
-                20,
-                125,
-                405);
+                20, 125, 405);
 
             Label lblConfirmarSenha = CriarRotulo(
                 "Confirmar nova senha:",
-                20,
-                165,
-                400);
+                20, 165, 400);
 
             TextBox txtConfirmarSenha = CriarCampoSenha(
-                20,
-                190,
-                405);
+                20, 190, 405);
 
             Label lblRequisitos = new()
             {
                 Text =
                     "Mínimo de 8 caracteres, com maiúscula, " +
                     "minúscula, número e especial.",
-
                 Left = 20,
                 Top = 225,
                 Width = 405,
@@ -465,20 +444,41 @@ namespace PIM_IV.Painel_ADM
             janela.AcceptButton = btnSalvar;
 
             bool senhaAlterada = false;
+            bool alteracaoEmAndamento = false;
 
-            // Mantém a janela aberta caso a validação falhe.
-            btnSalvar.Click += (_, _) =>
+            // Impede o fechamento durante uma requisição.
+            janela.FormClosing += (_, evento) =>
             {
-                senhaAlterada = ProcessarTrocaObrigatoriaSenha(
-                    janela,
-                    btnSalvar,
-                    usuario,
-                    senhaInicial,
-                    txtNovaSenha,
-                    txtConfirmarSenha);
+                if (alteracaoEmAndamento)
+                {
+                    evento.Cancel = true;
+                }
+            };
+
+            // Solicita a alteração de senha através da API.
+            btnSalvar.Click += async (_, _) =>
+            {
+                alteracaoEmAndamento = true;
+
+                try
+                {
+                    senhaAlterada =
+                        await ProcessarTrocaObrigatoriaSenhaAsync(
+                            janela,
+                            btnSalvar,
+                            senhaInicial,
+                            txtNovaSenha,
+                            txtConfirmarSenha);
+                }
+                finally
+                {
+                    alteracaoEmAndamento = false;
+                }
 
                 if (senhaAlterada)
                 {
+                    usuario.DeveAlterarSenha = false;
+
                     janela.DialogResult = DialogResult.OK;
                     janela.Close();
                 }
@@ -489,11 +489,13 @@ namespace PIM_IV.Painel_ADM
             return senhaAlterada;
         }
 
-        // Valida a nova senha antes de solicitar a atualização.
-        private static bool ProcessarTrocaObrigatoriaSenha(
+        /// <summary>
+        /// Valida a nova senha e solicita sua atualização
+        /// através do serviço de autenticação.
+        /// </summary>
+        private async Task<bool> ProcessarTrocaObrigatoriaSenhaAsync(
             Form janela,
             Button btnSalvar,
-            Usuario usuario,
             string senhaInicial,
             TextBox txtNovaSenha,
             TextBox txtConfirmarSenha)
@@ -503,15 +505,17 @@ namespace PIM_IV.Painel_ADM
                 string novaSenha = txtNovaSenha.Text;
                 string confirmacao = txtConfirmarSenha.Text;
 
+                // Verifica se as senhas informadas coincidem.
                 if (novaSenha != confirmacao)
                 {
                     throw new ArgumentException(
                         "As novas senhas não coincidem.");
                 }
 
-                // Reutiliza a regra de complexidade do serviço.
+                // Reutiliza a regra de complexidade existente.
                 UsuarioService.ValidarSenha(novaSenha);
 
+                // Impede a reutilização da senha provisória.
                 if (novaSenha == senhaInicial)
                 {
                     throw new ArgumentException(
@@ -519,11 +523,15 @@ namespace PIM_IV.Painel_ADM
                 }
 
                 btnSalvar.Enabled = false;
+                txtNovaSenha.Enabled = false;
+                txtConfirmarSenha.Enabled = false;
 
-                SalvarNovaSenha(
-                    usuario.IdUsuario,
+                // A API valida a senha atual, gera o novo hash
+                // e atualiza os dados no Azure SQL.
+                await _autenticacaoService.AlterarSenhaAsync(
                     senhaInicial,
-                    novaSenha);
+                    novaSenha,
+                    confirmacao);
 
                 return true;
             }
@@ -551,170 +559,12 @@ namespace PIM_IV.Painel_ADM
             finally
             {
                 btnSalvar.Enabled = true;
+                txtNovaSenha.Enabled = true;
+                txtConfirmarSenha.Enabled = true;
             }
         }
 
-        // Atualiza o hash da senha e registra a operação em uma transação.
-        private static void SalvarNovaSenha(
-            int idUsuario,
-            string senhaInicial,
-            string novaSenha)
-        {
-            string novoHash = SenhaHelper.GerarHash(novaSenha);
-
-            using SqlConnection conexao = Conexao.CriarConexao();
-
-            conexao.Open();
-
-            using SqlTransaction transacao =
-                conexao.BeginTransaction();
-
-            try
-            {
-                string hashAtual = ConsultarHashSenhaInicial(
-                    conexao,
-                    transacao,
-                    idUsuario);
-
-                // Confirma que a senha autenticada ainda é válida.
-                if (!SenhaHelper.VerificarSenha(
-                    senhaInicial,
-                    hashAtual))
-                {
-                    throw new InvalidOperationException(
-                        "A senha inicial não é mais válida. " +
-                        "Faça o login novamente.");
-                }
-
-                AtualizarSenhaUsuario(
-                    conexao,
-                    transacao,
-                    idUsuario,
-                    novoHash);
-
-                RegistrarAuditoriaTrocaSenha(
-                    conexao,
-                    transacao,
-                    idUsuario);
-
-                transacao.Commit();
-            }
-            catch
-            {
-                transacao.Rollback();
-                throw;
-            }
-        }
-
-        // Bloqueia o registro durante a validação da senha inicial.
-        private static string ConsultarHashSenhaInicial(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idUsuario)
-        {
-            const string sql = @"
-                SELECT SenhaHash
-                FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
-                WHERE IdUsuario = @IdUsuario
-                  AND Ativo = 1
-                  AND DeveAlterarSenha = 1";
-
-            using SqlCommand comando = new(
-                sql,
-                conexao,
-                transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = idUsuario;
-
-            string? hashAtual =
-                comando.ExecuteScalar() as string;
-
-            if (hashAtual == null)
-            {
-                throw new InvalidOperationException(
-                    "A senha inicial não é mais válida. " +
-                    "Faça o login novamente.");
-            }
-
-            return hashAtual;
-        }
-
-        // Grava o novo hash e libera o acesso sem senha provisória.
-        private static void AtualizarSenhaUsuario(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idUsuario,
-            string novoHash)
-        {
-            const string sql = @"
-                UPDATE dbo.Usuarios
-                SET SenhaHash = @SenhaHash,
-                    DeveAlterarSenha = 0
-                WHERE IdUsuario = @IdUsuario
-                  AND Ativo = 1
-                  AND DeveAlterarSenha = 1";
-
-            using SqlCommand comando = new(
-                sql,
-                conexao,
-                transacao);
-
-            comando.Parameters.Add(
-                "@SenhaHash",
-                SqlDbType.NVarChar,
-                500).Value = novoHash;
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = idUsuario;
-
-            int linhasAfetadas = comando.ExecuteNonQuery();
-
-            if (linhasAfetadas != 1)
-            {
-                throw new InvalidOperationException(
-                    "Não foi possível atualizar a senha.");
-            }
-        }
-
-        // Registra a troca sem armazenar senhas ou hashes no histórico.
-        private static void RegistrarAuditoriaTrocaSenha(
-            SqlConnection conexao,
-            SqlTransaction transacao,
-            int idUsuario)
-        {
-            const string sql = @"
-                INSERT INTO dbo.LogsAtividades
-                    (IdUsuario, Acao, Descricao)
-                VALUES
-                    (@IdUsuario, @Acao, @Descricao)";
-
-            using SqlCommand comando = new(
-                sql,
-                conexao,
-                transacao);
-
-            comando.Parameters.Add(
-                "@IdUsuario",
-                SqlDbType.Int).Value = idUsuario;
-
-            comando.Parameters.Add(
-                "@Acao",
-                SqlDbType.NVarChar,
-                100).Value = AcaoAuditoriaTrocaSenha;
-
-            comando.Parameters.Add(
-                "@Descricao",
-                SqlDbType.NVarChar,
-                500).Value =
-                    "Usuário alterou a senha inicial no primeiro acesso.";
-
-            comando.ExecuteNonQuery();
-        }
-
-        // Cria rótulos padronizados para as janelas de senha.
+        // Cria rótulos padronizados para as janelas auxiliares.
         private static Label CriarRotulo(
             string texto,
             int posicaoX,
@@ -746,7 +596,7 @@ namespace PIM_IV.Painel_ADM
             };
         }
 
-        // Centraliza as mensagens apresentadas pelo formulário.
+        // Centraliza as mensagens do formulário principal.
         private static void ExibirMensagem(
             string mensagem,
             string titulo,
@@ -759,7 +609,7 @@ namespace PIM_IV.Painel_ADM
                 icone);
         }
 
-        // Exibe mensagens vinculadas a uma janela secundária.
+        // Centraliza as mensagens das janelas auxiliares.
         private static void ExibirMensagem(
             Form janela,
             string mensagem,
