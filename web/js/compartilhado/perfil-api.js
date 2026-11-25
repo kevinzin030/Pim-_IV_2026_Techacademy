@@ -37,7 +37,7 @@
 
         sessionStorage.removeItem("usuario_logado");
 
-        window.location.replace("index.html");
+        window.location.replace("../../index.html");
     }
 
     /**

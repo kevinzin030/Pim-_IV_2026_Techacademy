@@ -297,7 +297,7 @@ function carregarProfessorAutenticado() {
             usuario.role !== 'professor'
         )
     ) {
-        window.location.replace('index.html');
+        window.location.replace('../../index.html');
         return false;
     }
 

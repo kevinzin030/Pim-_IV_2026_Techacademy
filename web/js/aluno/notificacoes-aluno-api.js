@@ -67,7 +67,7 @@
                 "usuario_logado"
             );
 
-            window.location.replace("index.html");
+            window.location.replace("../../index.html");
 
             throw new Error("Sessão expirada.");
         }

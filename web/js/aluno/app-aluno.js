@@ -5,7 +5,7 @@ const CONFIGURACAO_ALUNO = {
     chaveToken: 'techacademy_token',
     chaveDadosCompartilhados: 'techacademy_shared_v1',
     chaveFaltas: 'techacademy_faltas',
-    paginaLogin: 'index.html',
+    paginaLogin: '../../index.html',
     perfilAluno: 4
 };
 

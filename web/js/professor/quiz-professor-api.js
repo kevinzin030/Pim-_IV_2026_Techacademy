@@ -36,7 +36,7 @@
         );
 
         if (!token) {
-            window.location.replace("index.html");
+            window.location.replace("../../index.html");
 
             throw new Error("Sessão não encontrada.");
         }
@@ -70,7 +70,7 @@
                 CONFIGURACAO.chaveSessao
             );
 
-            window.location.replace("index.html");
+            window.location.replace("../../index.html");
         }
 
         if (!resposta.ok) {

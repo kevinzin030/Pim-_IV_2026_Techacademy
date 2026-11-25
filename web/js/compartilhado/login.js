@@ -329,8 +329,8 @@ function salvarSessao(usuario, token) {
 function redirecionarUsuario(usuario) {
     const destino =
         Number(usuario.idPerfil) === PERFIS.PROFESSOR
-            ? "dashboard-professor.html"
-            : "dashboard-aluno.html";
+            ? "pages/professor/dashboard-professor.html"
+            : "pages/aluno/dashboard-aluno.html";
 
     window.location.assign(destino);
 }

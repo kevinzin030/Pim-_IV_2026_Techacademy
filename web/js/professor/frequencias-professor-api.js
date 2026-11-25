@@ -60,7 +60,7 @@
         );
 
         if (!token) {
-            window.location.href = "index.html";
+            window.location.href = "../../index.html";
 
             throw new Error("Sessão expirada.");
         }
@@ -91,7 +91,7 @@
                 "usuario_logado"
             );
 
-            window.location.href = "index.html";
+            window.location.href = "../../index.html";
         }
 
         if (!resposta.ok) {
