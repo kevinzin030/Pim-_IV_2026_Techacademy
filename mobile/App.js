@@ -1591,7 +1591,7 @@ function Aplicativo() {
         </View>
 
         <ScrollView
-          style={estilos.rolagemPainel} scrollEnabled={!telaInicio}
+          style={estilos.rolagemPainel} scrollEnabled={true}
           contentContainerStyle={
             estilos.conteudoPainel
           }
